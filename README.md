@@ -40,6 +40,7 @@ Note that:
 USB Device | HAL |
 ---------- | ---------- |
 Tag v2.5.1 | Tag v1.10.2 ([stm32l0xx_hal_driver](https://github.com/STMicroelectronics/stm32l0xx_hal_driver))
+Tag v2.5.2 | Tag v1.4.0 ([stm32l1xx_hal_driver](https://github.com/STMicroelectronics/stm32l1xx_hal_driver))
 
 ## Troubleshooting
 

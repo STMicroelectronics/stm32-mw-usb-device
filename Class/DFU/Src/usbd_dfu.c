@@ -1095,7 +1095,6 @@ static void DFU_Leave(USBD_HandleTypeDef *pdev)
   }
   else
   {
-
     hdfu->dev_state = DFU_STATE_MANIFEST_WAIT_RESET;
 
     hdfu->dev_status[1] = 0U;
@@ -1112,8 +1111,7 @@ static void DFU_Leave(USBD_HandleTypeDef *pdev)
     /* Generate system reset to allow jumping to the user code */
     NVIC_SystemReset();
 
-    /* This instruction will not be reached (system reset) */
-    for(;;){}
+    /* The next instructions will not be reached (system reset) */
   }
 }
 
