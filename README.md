@@ -29,21 +29,6 @@ This software component is licensed by  ST under Ultimate Liberty license SLA004
 
 Details about the content of this release are available in the release note [here](https://htmlpreview.github.io/?https://github.com/STMicroelectronics/stm32_mw_usb_device/blob/master/Release_Notes.html).
 
-## Compatibility information
-
-This table shows the correspondence between the USB Device MW version and the corresponding HAL version of the targeted series. It is **crucial** that you use a consistent set of versions for the MW - HAL, as mentioned in this table.
-
-Note that:
-* in case a series does not support a particular tag, it is not mentioned in front of it.
-* in case a series supports a recent tag, it is not mentioned in front of older ones.
-
-USB Device | HAL |
----------- | ---------- |
-Tag v2.5.1 | Tag v1.10.2 ([stm32l0xx_hal_driver](https://github.com/STMicroelectronics/stm32l0xx_hal_driver))
-Tag v2.5.2 | Tag v1.4.0 ([stm32l1xx_hal_driver](https://github.com/STMicroelectronics/stm32l1xx_hal_driver))
-Tag v2.5.3 | Tag v1.7.3 ([stm32f0xx_hal_driver](https://github.com/STMicroelectronics/stm32f0xx_hal_driver))<br>Tag v1.1.4 ([stm32f1xx_hal_driver](https://github.com/STMicroelectronics/stm32f1xx_hal_driver))<br>Tag v1.2.4 ([stm32f2xx_hal_driver](https://github.com/STMicroelectronics/stm32f2xx_hal_driver))<br>Tag v1.5.3 ([stm32f3xx_hal_driver](https://github.com/STMicroelectronics/stm32f3xx_hal_driver))
-Tag v2.6.0 | Tag v1.7.8 ([stm32f4xx_hal_driver](https://github.com/STMicroelectronics/stm32f4xx_hal_driver))<br>Tag v1.2.8 ([stm32f7xx_hal_driver](https://github.com/STMicroelectronics/stm32f7xx_hal_driver))<br>Tag v1.9.0 ([stm32h7xx_hal_driver](https://github.com/STMicroelectronics/stm32h7xx_hal_driver))<br>Tag v1.12.0 ([stm32l4xx_hal_driver](https://github.com/STMicroelectronics/stm32l4xx_hal_driver))<br>Tag v1.6.0 ([stm32wbxx_hal_driver](https://github.com/STMicroelectronics/stm32wbxx_hal_driver))
-
 ## Troubleshooting
 
 If you have any issue with the **software content** of this repository, you can file an issue [here](https://github.com/STMicroelectronics/stm32_mw_usb_device/issues/new/choose).
