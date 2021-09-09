@@ -4,6 +4,18 @@
   * @author  MCD Application Team
   * @brief   This file provides the Audio core functions.
   *
+  *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2015 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   * @verbatim
   *
   *          ===================================================================
@@ -38,18 +50,6 @@
   *
   *
   *  @endverbatim
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2015 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                      www.st.com/SLA0044
-  *
   ******************************************************************************
   */
 
@@ -93,10 +93,11 @@ EndBSPDependencies */
 /** @defgroup USBD_AUDIO_Private_Macros
   * @{
   */
-#define AUDIO_SAMPLE_FREQ(frq)         (uint8_t)(frq), (uint8_t)((frq >> 8)), (uint8_t)((frq >> 16))
+#define AUDIO_SAMPLE_FREQ(frq) \
+  (uint8_t)(frq), (uint8_t)((frq >> 8)), (uint8_t)((frq >> 16))
 
-#define AUDIO_PACKET_SZE(frq)          (uint8_t)(((frq * 2U * 2U)/1000U) & 0xFFU), \
-                                       (uint8_t)((((frq * 2U * 2U)/1000U) >> 8) & 0xFFU)
+#define AUDIO_PACKET_SZE(frq) \
+  (uint8_t)(((frq * 2U * 2U) / 1000U) & 0xFFU), (uint8_t)((((frq * 2U * 2U) / 1000U) >> 8) & 0xFFU)
 
 /**
   * @}
@@ -533,7 +534,6 @@ static uint8_t USBD_AUDIO_Setup(USBD_HandleTypeDef *pdev,
 /**
   * @brief  USBD_AUDIO_GetCfgDesc
   *         return configuration descriptor
-  * @param  speed : current device speed
   * @param  length : pointer data length
   * @retval pointer to descriptor buffer
   */
@@ -620,6 +620,7 @@ static uint8_t USBD_AUDIO_SOF(USBD_HandleTypeDef *pdev)
   * @brief  USBD_AUDIO_SOF
   *         handle SOF event
   * @param  pdev: device instance
+  * @param  offset: audio offset
   * @retval status
   */
 void USBD_AUDIO_Sync(USBD_HandleTypeDef *pdev, AUDIO_OffsetTypeDef offset)
@@ -777,7 +778,7 @@ static uint8_t USBD_AUDIO_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 /**
   * @brief  AUDIO_Req_GetCurrent
   *         Handles the GET_CUR Audio control request.
-  * @param  pdev: instance
+  * @param  pdev: device instance
   * @param  req: setup class request
   * @retval status
   */
@@ -801,7 +802,7 @@ static void AUDIO_REQ_GetCurrent(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 /**
   * @brief  AUDIO_Req_SetCurrent
   *         Handles the SET_CUR Audio control request.
-  * @param  pdev: instance
+  * @param  pdev: device instance
   * @param  req: setup class request
   * @retval status
   */
@@ -842,6 +843,7 @@ static uint8_t *USBD_AUDIO_GetDeviceQualifierDesc(uint16_t *length)
 
 /**
   * @brief  USBD_AUDIO_RegisterInterface
+  * @param  pdev: device instance
   * @param  fops: Audio interface callback
   * @retval status
   */
@@ -870,5 +872,3 @@ uint8_t USBD_AUDIO_RegisterInterface(USBD_HandleTypeDef *pdev,
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

@@ -4,6 +4,17 @@
   * @author  MCD Application Team
   * @brief   This file provides the DFU core functions.
   *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2015 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   * @verbatim
   *
   *          ===================================================================
@@ -32,17 +43,6 @@
   *             - Manifestation Tolerant mode
   *
   *  @endverbatim
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2015 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                      www.st.com/SLA0044
   *
   ******************************************************************************
   */
@@ -466,7 +466,6 @@ static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
 /**
   * @brief  USBD_DFU_GetCfgDesc
   *         return configuration descriptor
-  * @param  speed : current device speed
   * @param  length : pointer data length
   * @retval pointer to descriptor buffer
   */
@@ -627,7 +626,7 @@ static uint8_t *USBD_DFU_GetDeviceQualifierDesc(uint16_t *length)
 /**
   * @brief  USBD_DFU_GetUsrStringDesc
   *         Manages the transfer of memory interfaces string descriptors.
-  * @param  speed : current device speed
+  * @param  pdev: device instance
   * @param  index: descriptor index
   * @param  length : pointer data length
   * @retval pointer to the descriptor table or NULL if the descriptor is not supported.
@@ -654,6 +653,7 @@ static uint8_t *USBD_DFU_GetUsrStringDesc(USBD_HandleTypeDef *pdev, uint8_t inde
 
 /**
   * @brief  USBD_MSC_RegisterStorage
+  * @param  pdev: device instance
   * @param  fops: storage callback
   * @retval status
   */
@@ -1112,4 +1112,3 @@ static void DFU_Leave(USBD_HandleTypeDef *pdev)
   * @}
   */
 
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

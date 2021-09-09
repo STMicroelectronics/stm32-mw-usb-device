@@ -8,13 +8,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2015 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2015 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                      www.st.com/SLA0044
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -28,7 +27,7 @@
 /* Private define ------------------------------------------------------------*/
 #define USBD_VID                      0x0483
 #define USBD_PID                      0xaaaa  /* Replace '0xaaaa' with your device product ID */
-#define USBD_LANGID_STRING            0xbbb  /* Replace '0xbbb' with your device language ID */
+#define USBD_LANGID_STRING            0xbbb   /* Replace '0xbbb' with your device language ID */
 #define USBD_MANUFACTURER_STRING      "xxxxx" /* Add your manufacturer string */
 #define USBD_PRODUCT_HS_STRING        "xxxxx" /* Add your product High Speed string */
 #define USBD_PRODUCT_FS_STRING        "xxxxx" /* Add your product Full Speed string */
@@ -184,8 +183,8 @@ __ALIGN_BEGIN  uint8_t USBD_BOSDesc[USB_SIZ_BOS_DESC] __ALIGN_END =
 
   0x00,                                /* bAlternateMode[0] Index of the Alternate Mode within the SVID as
                                         returned in response to a Discover Modes command. Example:
-                                        0 – first Mode entry
-                                        1 – second mode entry */
+                                        0  first Mode entry
+                                        1  second mode entry */
 
   USBD_BB_ALTMODE0_STRING_INDEX,           /* iAlternateModeString[0]: Index of string descriptor describing protocol.
                                         It is optional to support this string. */
@@ -195,10 +194,10 @@ __ALIGN_BEGIN  uint8_t USBD_BOSDesc[USB_SIZ_BOS_DESC] __ALIGN_END =
 
   0x01,                                /* bAlternateMode[1] Index of the Alternate Mode within the SVID as
                                         returned in response to a Discover Modes command. Example:
-                                        0 – first Mode entry
-                                        1 – second Mode entry */
+                                        0  first Mode entry
+                                        1  second Mode entry */
 
-  USBD_BB_ALTMODE1_STRING_INDEX,           /* iAlternateModeString[1]: Index of string descriptor describing protocol.
+  USBD_BB_ALTMODE1_STRING_INDEX,       /* iAlternateModeString[1]: Index of string descriptor describing protocol.
                                         It is optional to support this string. */
   /* Alternate Mode Desc */
   /* ----------- Device Capability Descriptor: BillBoard Alternate Mode Desc ---------- */
@@ -447,5 +446,3 @@ static void IntToUnicode(uint32_t value, uint8_t *pbuf, uint8_t len)
     pbuf[2U * idx + 1] = 0U;
   }
 }
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

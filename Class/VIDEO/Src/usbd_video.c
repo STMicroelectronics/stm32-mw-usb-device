@@ -4,6 +4,17 @@
   * @author  MCD Application Team
   * @brief   This file provides the Video core functions.
   *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2020 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   * @verbatim
   *
   *          ===================================================================
@@ -33,17 +44,6 @@
   *
   *
   *  @endverbatim
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2020 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                      www.st.com/SLA0044
   *
   ******************************************************************************
   */
@@ -757,7 +757,7 @@ static void VIDEO_REQ_GetCurrent(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 
       /* Probe Request */
       (void)USBD_CtlSendData(pdev, (uint8_t *)&video_Probe_Control,
-                              MIN(req->wLength, sizeof(USBD_VideoControlTypeDef)));
+                             MIN(req->wLength, sizeof(USBD_VideoControlTypeDef)));
     }
     else if (LOBYTE(req->wValue) == (uint8_t)VS_COMMIT_CONTROL)
     {
@@ -774,7 +774,7 @@ static void VIDEO_REQ_GetCurrent(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 
       /* Commit Request */
       (void)USBD_CtlSendData(pdev, (uint8_t *)&video_Commit_Control,
-                              MIN(req->wLength, sizeof(USBD_VideoControlTypeDef)));
+                             MIN(req->wLength, sizeof(USBD_VideoControlTypeDef)));
     }
     else
     {
@@ -957,7 +957,7 @@ static void *USBD_VIDEO_GetVSFrameDesc(uint8_t *pConfDesc)
       pdesc = USBD_VIDEO_GetNextDesc((uint8_t *)pdesc, &ptr);
 
       if (((pdesc->bDescriptorSubType == VS_FRAME_MJPEG) ||
-          (pdesc->bDescriptorSubType == VS_FRAME_UNCOMPRESSED)) &&
+           (pdesc->bDescriptorSubType == VS_FRAME_UNCOMPRESSED)) &&
           (pdesc->bLength == VS_FRAME_DESC_SIZE))
       {
         pVSFrameDesc = (USBD_VIDEO_VSFrameDescTypeDef *)(void *)pdesc;
@@ -1045,7 +1045,3 @@ uint8_t USBD_VIDEO_RegisterInterface(USBD_HandleTypeDef   *pdev, USBD_VIDEO_ItfT
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
-
-

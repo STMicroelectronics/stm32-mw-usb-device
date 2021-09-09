@@ -6,13 +6,12 @@
   ******************************************************************************
   * @attention
   *
-  * <h2><center>&copy; Copyright (c) 2015 STMicroelectronics.
-  * All rights reserved.</center></h2>
+  * Copyright (c) 2015 STMicroelectronics.
+  * All rights reserved.
   *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                      www.st.com/SLA0044
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
   *
   ******************************************************************************
   */
@@ -133,20 +132,20 @@ typedef  void (*pFunction)(void);
 
 
 /**********  Descriptor of DFU interface 0 Alternate setting n ****************/
-#define USBD_DFU_IF_DESC(n)           0x09,   /* bLength: Interface Descriptor size */ \
-                                      USB_DESC_TYPE_INTERFACE,   /* bDescriptorType */ \
-                                      0x00,   /* bInterfaceNumber: Number of Interface */ \
-                                      (n),      /* bAlternateSetting: Alternate setting */ \
-                                      0x00,   /* bNumEndpoints*/ \
-                                      0xFE,   /* bInterfaceClass: Application Specific Class Code */ \
-                                      0x01,   /* bInterfaceSubClass : Device Firmware Upgrade Code */ \
-                                      0x02,   /* nInterfaceProtocol: DFU mode protocol */ \
-                                      USBD_IDX_INTERFACE_STR + (n) + 1U /* iInterface: Index of string descriptor */ \
+#define USBD_DFU_IF_DESC(n) \
+  0x09,   /* bLength: Interface Descriptor size */ \
+  USB_DESC_TYPE_INTERFACE,   /* bDescriptorType */ \
+  0x00,   /* bInterfaceNumber: Number of Interface */ \
+  (n),      /* bAlternateSetting: Alternate setting */ \
+  0x00,   /* bNumEndpoints*/ \
+  0xFE,   /* bInterfaceClass: Application Specific Class Code */ \
+  0x01,   /* bInterfaceSubClass : Device Firmware Upgrade Code */ \
+  0x02,   /* nInterfaceProtocol: DFU mode protocol */ \
+  USBD_IDX_INTERFACE_STR + (n) + 1U /* iInterface: Index of string descriptor */
 
-#define TRANSFER_SIZE_BYTES(size)      ((uint8_t)(size)), /* XFERSIZEB0 */\
-                                       ((uint8_t)((size) >> 8)) /* XFERSIZEB1 */
+#define TRANSFER_SIZE_BYTES(size)      ((uint8_t)(size)), ((uint8_t)((size) >> 8))
 
-#define IS_PROTECTED_AREA(add)         (uint8_t)((((add) >= 0x08000000) && ((add) < (APP_DEFAULT_ADD)))? 1:0)
+#define IS_PROTECTED_AREA(add)         (uint8_t)((((add) >= 0x08000000) && ((add) < (APP_DEFAULT_ADD))) ? 1 : 0)
 
 /**
   * @}
@@ -231,5 +230,3 @@ uint8_t USBD_DFU_RegisterMedia(USBD_HandleTypeDef *pdev,
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

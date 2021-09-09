@@ -10,6 +10,17 @@
   *           - Command IN transfer (class requests management)
   *           - Error management
   *
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2019 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
   *  @verbatim
   *
   *          ===================================================================
@@ -35,17 +46,6 @@
   *             - All communication classes other than PSTN are not managed
   *
   *  @endverbatim
-  *
-  ******************************************************************************
-  * @attention
-  *
-  * <h2><center>&copy; Copyright (c) 2019 STMicroelectronics.
-  * All rights reserved.</center></h2>
-  *
-  * This software component is licensed by ST under Ultimate Liberty license
-  * SLA0044, the "License"; You may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at:
-  *                      www.st.com/SLA0044
   *
   ******************************************************************************
   */
@@ -729,7 +729,7 @@ static uint8_t USBD_CDC_RNDIS_Setup(USBD_HandleTypeDef *pdev,
         else
         {
           hcdc->CmdOpCode = req->bRequest;
-          hcdc->CmdLength = (uint8_t)MIN(CDC_RNDIS_CMD_PACKET_SIZE, req->wLength);
+          hcdc->CmdLength = (uint8_t)MIN(CDC_RNDIS_MAX_INFO_BUFF_SZ, req->wLength);
 
           (void)USBD_CtlPrepareRx(pdev, (uint8_t *)hcdc->data, hcdc->CmdLength);
         }
@@ -807,7 +807,7 @@ static uint8_t USBD_CDC_RNDIS_Setup(USBD_HandleTypeDef *pdev,
 static uint8_t USBD_CDC_RNDIS_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
   USBD_CDC_RNDIS_HandleTypeDef *hcdc;
-  PCD_HandleTypeDef *hpcd = pdev->pData;
+  PCD_HandleTypeDef *hpcd = (PCD_HandleTypeDef *)pdev->pData;
 
   if (pdev->pClassData == NULL)
   {
@@ -950,7 +950,6 @@ static uint8_t USBD_CDC_RNDIS_EP0_RxReady(USBD_HandleTypeDef *pdev)
 /**
   * @brief  USBD_CDC_RNDIS_GetFSCfgDesc
   *         Return configuration descriptor
-  * @param  speed : current device speed
   * @param  length : pointer data length
   * @retval pointer to descriptor buffer
   */
@@ -964,7 +963,6 @@ static uint8_t *USBD_CDC_RNDIS_GetFSCfgDesc(uint16_t *length)
 /**
   * @brief  USBD_CDC_RNDIS_GetHSCfgDesc
   *         Return configuration descriptor
-  * @param  speed : current device speed
   * @param  length : pointer data length
   * @retval pointer to descriptor buffer
   */
@@ -978,7 +976,6 @@ static uint8_t *USBD_CDC_RNDIS_GetHSCfgDesc(uint16_t *length)
 /**
   * @brief  USBD_CDC_RNDIS_GetOtherSpeedCfgDesc
   *         Return configuration descriptor
-  * @param  speed : current device speed
   * @param  length : pointer data length
   * @retval pointer to descriptor buffer
   */
@@ -1025,7 +1022,7 @@ uint8_t USBD_CDC_RNDIS_RegisterInterface(USBD_HandleTypeDef *pdev,
 /**
   * @brief  USBD_CDC_RNDIS_USRStringDescriptor
   *         Manages the transfer of user string descriptors.
-  * @param  speed : current device speed
+  * @param  pdev: device instance
   * @param  index: descriptor index
   * @param  length : pointer data length
   * @retval pointer to the descriptor table or NULL if the descriptor is not supported.
@@ -1053,6 +1050,7 @@ static uint8_t *USBD_CDC_RNDIS_USRStringDescriptor(USBD_HandleTypeDef *pdev, uin
   * @brief  USBD_CDC_RNDIS_SetTxBuffer
   * @param  pdev: device instance
   * @param  pbuff: Tx Buffer
+  * @param  length: Tx Buffer length
   * @retval status
   */
 uint8_t USBD_CDC_RNDIS_SetTxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff, uint32_t length)
@@ -1221,7 +1219,7 @@ uint8_t USBD_CDC_RNDIS_SendNotification(USBD_HandleTypeDef *pdev,
   /* Transmit notification packet */
   if (ReqSize != 0U)
   {
-    (void)USBD_LL_Transmit(pdev, CDC_RNDIS_CMD_EP, (uint8_t *) &(hcdc->Req), ReqSize);
+    (void)USBD_LL_Transmit(pdev, CDC_RNDIS_CMD_EP, (uint8_t *)&hcdc->Req, ReqSize);
   }
 
   return (uint8_t)ret;
@@ -1780,5 +1778,3 @@ static uint8_t USBD_CDC_RNDIS_ProcessUnsupportedMsg(USBD_HandleTypeDef *pdev,
 /**
   * @}
   */
-
-/************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
