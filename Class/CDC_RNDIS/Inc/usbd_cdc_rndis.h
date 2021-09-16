@@ -40,10 +40,15 @@ extern "C" {
 /** @defgroup usbd_cdc_rndis_Exported_Defines
   * @{
   */
-
+#ifndef CDC_RNDIS_IN_EP
 #define CDC_RNDIS_IN_EP                                   0x81U  /* EP1 for data IN */
+#endif /* CDC_RNDIS_IN_EP */
+#ifndef CDC_RNDIS_OUT_EP
 #define CDC_RNDIS_OUT_EP                                  0x01U  /* EP1 for data OUT */
+#endif /* CDC_RNDIS_OUT_EP */
+#ifndef CDC_RNDIS_CMD_EP
 #define CDC_RNDIS_CMD_EP                                  0x82U  /* EP2 for CDC_RNDIS commands */
+#endif /* CDC_RNDIS_CMD_EP */
 
 #ifndef CDC_RNDIS_CMD_ITF_NBR
 #define CDC_RNDIS_CMD_ITF_NBR                             0x00U /* Command Interface Number 0 */
@@ -263,15 +268,6 @@ typedef struct
   __IO uint32_t   NotificationStatus;
   __IO uint32_t   PacketFilter;
 } USBD_CDC_RNDIS_HandleTypeDef;
-
-
-typedef enum
-{
-  NETWORK_CONNECTION = 0x00,
-  RESPONSE_AVAILABLE = 0x01,
-  CONNECTION_SPEED_CHANGE = 0x2A
-} USBD_CDC_RNDIS_NotifCodeTypeDef;
-
 
 /* Messages Sent by the Host ---------------------*/
 
@@ -506,7 +502,7 @@ uint8_t USBD_CDC_RNDIS_SetTxBuffer(USBD_HandleTypeDef *pdev,
                                    uint8_t *pbuff, uint32_t length);
 
 uint8_t USBD_CDC_RNDIS_SendNotification(USBD_HandleTypeDef *pdev,
-                                        USBD_CDC_RNDIS_NotifCodeTypeDef Notif,
+                                        USBD_CDC_NotifCodeTypeDef Notif,
                                         uint16_t bVal, uint8_t *pData);
 /**
   * @}

@@ -18,7 +18,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 
-#include "main.h"
+#include "usbd_cdc_ecm_if_template.h"
 /*
 
   Include here  LwIP files if used
@@ -32,13 +32,13 @@
 /* Received Data over USB are stored in this buffer */
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma data_alignment=4
-#endif
+#endif /* ( __ICCARM__ ) */
 __ALIGN_BEGIN static uint8_t UserRxBuffer[CDC_ECM_ETH_MAX_SEGSZE + 100]__ALIGN_END;
 
 /* Transmitted Data over CDC_ECM (CDC_ECM interface) are stored in this buffer */
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma data_alignment=4
-#endif
+#endif /* ( __ICCARM__ ) */
 __ALIGN_BEGIN  static uint8_t UserTxBuffer[CDC_ECM_ETH_MAX_SEGSZE + 100]__ALIGN_END;
 
 static uint8_t CDC_ECMInitialized = 0U;
@@ -99,7 +99,11 @@ static int8_t CDC_ECM_Itf_Init(void)
   */
 static int8_t CDC_ECM_Itf_DeInit(void)
 {
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(USBD_Device.pClassDataCmsit[USBD_Device.classId]);
+#else
   USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(USBD_Device.pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
   /* Notify application layer that link is down */
   hcdc_cdc_ecm->LinkStatus = 0U;
@@ -117,7 +121,11 @@ static int8_t CDC_ECM_Itf_DeInit(void)
   */
 static int8_t CDC_ECM_Itf_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 {
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(USBD_Device.pClassDataCmsit[USBD_Device.classId]);
+#else
   USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(USBD_Device.pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
   switch (cmd)
   {
@@ -188,7 +196,11 @@ static int8_t CDC_ECM_Itf_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 static int8_t CDC_ECM_Itf_Receive(uint8_t *Buf, uint32_t *Len)
 {
   /* Get the CDC_ECM handler pointer */
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(USBD_Device.pClassDataCmsit[USBD_Device.classId]);
+#else
   USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(USBD_Device.pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
   /* Call Eth buffer processing */
   hcdc_cdc_ecm->RxState = 1U;
@@ -230,9 +242,18 @@ static int8_t CDC_ECM_Itf_TransmitCplt(uint8_t *Buf, uint32_t *Len, uint8_t epnu
 static int8_t CDC_ECM_Itf_Process(USBD_HandleTypeDef *pdev)
 {
   /* Get the CDC_ECM handler pointer */
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(pdev->pClassDataCmsit[pdev->classId]);
+#else
   USBD_CDC_ECM_HandleTypeDef *hcdc_cdc_ecm = (USBD_CDC_ECM_HandleTypeDef *)(pdev->pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
-  if ((hcdc_cdc_ecm != NULL) && (hcdc_cdc_ecm->LinkStatus != 0U))
+  if (hcdc_cdc_ecm == NULL)
+  {
+    return (-1);
+  }
+
+  if (hcdc_cdc_ecm->LinkStatus != 0U)
   {
     /*
       Read a received packet from the Ethernet buffers and send it

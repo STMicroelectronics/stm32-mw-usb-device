@@ -28,7 +28,7 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #ifndef __USBD_CCID_IF_H
 #include "usbd_ccid_if_template.h"
-#endif
+#endif /* __USBD_CCID_IF_H */
 
 /* Exported constants --------------------------------------------------------*/
 #define T0_PROTOCOL                    0x00U  /* T0 protocol */
@@ -162,29 +162,29 @@ typedef enum
 /* Interface Byte structure - TA(i), TB(i), TC(i) and TD(i) ------------------*/
 typedef struct
 {
-  uint8_t Status;     /* The Presence of the Interface byte */
-  uint8_t Value;      /* The Value of the Interface byte */
-} SC_InterfaceByte;
+  uint8_t Status;               /* The Presence of the Interface byte */
+  uint8_t Value;                /* The Value of the Interface byte */
+} SC_InterfaceByteTypeDef;
 
 /* Protocol Level structure - ------------------------------------------------*/
 typedef struct
 {
-  SC_InterfaceByte InterfaceByte[MAX_INTERFACEBYTE];      /* The Values of the Interface byte TA(i), TB(i), TC(i)and TD(i) */
-} SC_ProtocolLevel;
+  SC_InterfaceByteTypeDef InterfaceByte[MAX_INTERFACEBYTE];     /* The Values of the Interface byte
+                                                                   TA(i), TB(i), TC(i)and TD(i) */
+} SC_ProtocolLevelTypeDef;
 
 /* ATR structure - Answer To Reset -------------------------------------------*/
 typedef struct
 {
-  uint8_t TS;                                 /* Bit Convention Direct/Indirect */
-  uint8_t T0;                                 /* Each bit in the high nibble = Presence of the further interface byte;
-                                                 Low nibble = Number of historical byte */
-
-  SC_ProtocolLevel T[MAX_PROTOCOLLEVEL];      /* Setup array */
-  uint8_t H[HIST_LENGTH];                     /* Historical array */
-  uint8_t Tlength;                            /* Setup array dimension */
-  uint8_t Hlength;                            /* Historical array dimension */
+  uint8_t TS;                                   /* Bit Convention Direct/Indirect */
+  uint8_t T0;                                   /* Each bit in the high nibble = Presence of the further interface byte;
+                                                   Low nibble = Number of historical byte */
+  SC_ProtocolLevelTypeDef T[MAX_PROTOCOLLEVEL]; /* Setup array */
+  uint8_t Historical[HIST_LENGTH];              /* Historical array */
+  uint8_t Tlength;                              /* Setup array dimension */
+  uint8_t Hlength;                              /* Historical array dimension */
   uint8_t TCK;
-} SC_ATR;
+} SC_ATRTypeDef;
 
 /* ADPU-Header command structure ---------------------------------------------*/
 typedef struct
@@ -193,7 +193,7 @@ typedef struct
   uint8_t INS;  /* Operation code */
   uint8_t P1;   /* Selection Mode */
   uint8_t P2;   /* Selection Option */
-} SC_Header;
+} SC_HeaderTypeDef;
 
 /* ADPU-Body command structure -----------------------------------------------*/
 typedef struct
@@ -201,22 +201,22 @@ typedef struct
   uint8_t LC;           /* Data field length */
   uint8_t Data[LC_MAX]; /* Command parameters */
   uint8_t LE;           /* Expected length of data to be returned */
-} SC_Body;
+} SC_BodyTypeDef;
 
 /* ADPU Command structure ----------------------------------------------------*/
 typedef struct
 {
-  SC_Header Header;
-  SC_Body Body;
-} SC_ADPU_Commands;
+  SC_HeaderTypeDef Header;
+  SC_BodyTypeDef Body;
+} SC_ADPU_CommandsTypeDef;
 
 /* SC response structure -----------------------------------------------------*/
 typedef struct
 {
   uint8_t Data[LC_MAX];  /* Data returned from the card */
-  uint8_t SW1;          /* Command Processing status */
-  uint8_t SW2;          /* Command Processing qualification */
-} SC_ADPU_Response;
+  uint8_t SW1;           /* Command Processing status */
+  uint8_t SW2;           /* Command Processing qualification */
+} SC_ADPU_ResponseTypeDef;
 
 /* SC Command Status -----------------------------------------------------*/
 typedef enum
@@ -255,7 +255,7 @@ typedef enum
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 /* APPLICATION LAYER ---------------------------------------------------------*/
-void SC_Handler(SC_State *SCState, SC_ADPU_Commands *SC_ADPU, SC_ADPU_Response *SC_Response);
+void SC_Handler(SC_State *SCState, SC_ADPU_CommandsTypeDef *SC_ADPU, SC_ADPU_ResponseTypeDef *SC_Response);
 void SC_PowerCmd(SCPowerState NewState);
 void SC_ParityErrorHandler(void);
 void SC_PTSConfig(void);
@@ -266,11 +266,11 @@ void SC_SetState(SC_State scState);
 void SC_IOConfig(void);
 
 extern uint8_t SC_ATR_Table[40];
-extern SC_ATR SC_A2R;
-extern SC_ADPU_Response SC_Response;
+extern SC_ATRTypeDef SC_A2R;
+extern SC_ADPU_ResponseTypeDef SC_Response;
 
 extern uint8_t ProtocolNUM_OUT;
-extern SC_ADPU_Commands SC_ADPU;
+extern SC_ADPU_CommandsTypeDef SC_ADPU;
 
 #ifdef __cplusplus
 }

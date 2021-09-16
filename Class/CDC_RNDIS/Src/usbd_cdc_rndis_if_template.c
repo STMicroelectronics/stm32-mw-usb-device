@@ -30,7 +30,7 @@
 #include "ethernetif.h"
 */
 
-#include "main.h"
+#include "usbd_cdc_rndis_if_template.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
@@ -39,13 +39,13 @@
 /* Received Data over USB are stored in this buffer */
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma data_alignment=4
-#endif
+#endif /* __ICCARM__ */
 __ALIGN_BEGIN uint8_t UserRxBuffer[CDC_RNDIS_ETH_MAX_SEGSZE + 100] __ALIGN_END;
 
 /* Transmitted Data over CDC_RNDIS (CDC_RNDIS interface) are stored in this buffer */
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma data_alignment=4
-#endif
+#endif /* __ICCARM__ */
 __ALIGN_BEGIN static uint8_t UserTxBuffer[CDC_RNDIS_ETH_MAX_SEGSZE + 100] __ALIGN_END;
 
 static uint8_t CDC_RNDISInitialized = 0U;
@@ -109,7 +109,11 @@ static int8_t CDC_RNDIS_Itf_Init(void)
   */
 static int8_t CDC_RNDIS_Itf_DeInit(void)
 {
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(USBD_Device.pClassDataCmsit[USBD_Device.classId]);
+#else
   USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(USBD_Device.pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
   /*
      Add your code here
@@ -131,7 +135,11 @@ static int8_t CDC_RNDIS_Itf_DeInit(void)
   */
 static int8_t CDC_RNDIS_Itf_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 {
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(USBD_Device.pClassDataCmsit[USBD_Device.classId]);
+#else
   USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(USBD_Device.pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
   switch (cmd)
   {
@@ -174,7 +182,11 @@ static int8_t CDC_RNDIS_Itf_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 static int8_t CDC_RNDIS_Itf_Receive(uint8_t *Buf, uint32_t *Len)
 {
   /* Get the CDC_RNDIS handler pointer */
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(USBD_Device.pClassDataCmsit[USBD_Device.classId]);
+#else
   USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(USBD_Device.pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
   /* Call Eth buffer processing */
   hcdc_cdc_rndis->RxState = 1U;
@@ -217,9 +229,18 @@ static int8_t CDC_RNDIS_Itf_TransmitCplt(uint8_t *Buf, uint32_t *Len, uint8_t ep
 static int8_t CDC_RNDIS_Itf_Process(USBD_HandleTypeDef *pdev)
 {
   /* Get the CDC_RNDIS handler pointer */
-  USBD_CDC_RNDIS_HandleTypeDef   *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(pdev->pClassData);
+#ifdef USE_USBD_COMPOSITE
+  USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(pdev->pClassDataCmsit[pdev->classId]);
+#else
+  USBD_CDC_RNDIS_HandleTypeDef *hcdc_cdc_rndis = (USBD_CDC_RNDIS_HandleTypeDef *)(pdev->pClassData);
+#endif /* USE_USBD_COMPOSITE */
 
-  if ((hcdc_cdc_rndis != NULL) && (hcdc_cdc_rndis->LinkStatus != 0U))
+  if (hcdc_cdc_rndis == NULL)
+  {
+    return (-1);
+  }
+
+  if (hcdc_cdc_rndis->LinkStatus != 0U)
   {
     /*
        Add your code here

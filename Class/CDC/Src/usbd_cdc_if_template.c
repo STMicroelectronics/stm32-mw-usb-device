@@ -127,6 +127,8 @@ static int8_t TEMPLATE_DeInit(void)
   */
 static int8_t TEMPLATE_Control(uint8_t cmd, uint8_t *pbuf, uint16_t length)
 {
+  UNUSED(length);
+
   switch (cmd)
   {
     case CDC_SEND_ENCAPSULATED_COMMAND:

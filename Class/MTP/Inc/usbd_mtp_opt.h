@@ -27,7 +27,7 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #ifndef __USBD_MTP_IF_H
 #include "usbd_mtp_if_template.h"
-#endif
+#endif /* __USBD_MTP_IF_H */
 #include "usbd_mtp.h"
 
 /** @addtogroup STM32_USB_DEVICE_LIBRARY
@@ -43,6 +43,12 @@ extern "C" {
 /** @defgroup USBD_MTP_OPT_Exported_Defines
   * @{
   */
+
+/*
+ * MTP Class specification Revision 1.1
+ * Appendix B. Object Properties
+ */
+
 /* MTP OBJECT PROPERTIES supported*/
 #define    MTP_OB_PROP_STORAGE_ID                               0xDC01U
 #define    MTP_OB_PROP_OBJECT_FORMAT                            0xDC02U
@@ -231,6 +237,11 @@ extern "C" {
 #define      MTP_EVENT_OBJECTPROPDESCCHANGED                    0xC802U
 #define      MTP_EVENT_OBJECTREFERENCESCHANGED                  0xC803U
 
+/*
+ * MTP Class specification Revision 1.1
+ * Appendix D. Operations
+ */
+
 /* Operations code */
 #define      MTP_OP_GET_DEVICE_INFO                             0x1001U
 #define      MTP_OP_OPEN_SESSION                                0x1002U
@@ -266,6 +277,11 @@ extern "C" {
 #define      MTP_OP_GETSERVICEINFO                              0x9302U
 #define      MTP_OP_GETSERVICECAPABILITIES                      0x9303U
 #define      MTP_OP_GETSERVICEPROPDESC                          0x9304U
+
+/*
+ * MTP Class specification Revision 1.1
+ * Appendix C. Device Properties
+ */
 
 /* MTP device properties code*/
 #define    MTP_DEV_PROP_UNDEFINED                               0x5000U
@@ -327,22 +343,22 @@ extern "C" {
 #define    FREE_SPACE_IN_OBJ_NOT_USED                           0xFFFFFFFFU
 
 /* MTP storage type */
-#define    MTP_STORAGE_UNDEFINED                    0U
-#define    MTP_STORAGE_FIXED_ROM                    0x0001U
-#define    MTP_STORAGE_REMOVABLE_ROM                    0x0002U
-#define    MTP_STORAGE_FIXED_RAM                    0x0003U
-#define    MTP_STORAGE_REMOVABLE_RAM                        0x0004U
+#define    MTP_STORAGE_UNDEFINED                                0U
+#define    MTP_STORAGE_FIXED_ROM                                0x0001U
+#define    MTP_STORAGE_REMOVABLE_ROM                            0x0002U
+#define    MTP_STORAGE_FIXED_RAM                                0x0003U
+#define    MTP_STORAGE_REMOVABLE_RAM                            0x0004U
 
 /* MTP file system type */
-#define    MTP_FILESYSTEM_UNDEFINED                   0U
+#define    MTP_FILESYSTEM_UNDEFINED                             0U
 #define    MTP_FILESYSTEM_GENERIC_FLAT                          0x0001U
-#define    MTP_FILESYSTEM_GENERIC_HIERARCH                  0x0002U
-#define    MTP_FILESYSTEM_DCF                           0x0003U
+#define    MTP_FILESYSTEM_GENERIC_HIERARCH                      0x0002U
+#define    MTP_FILESYSTEM_DCF                                   0x0003U
 
 /* MTP access capability */
-#define    MTP_ACCESS_CAP_RW                      0U /* read write */
-#define    MTP_ACCESS_CAP_RO_WITHOUT_DEL                  0x0001U
-#define    MTP_ACCESS_CAP_RO_WITH_DEL                         0x0002U
+#define    MTP_ACCESS_CAP_RW                                    0U /* read write */
+#define    MTP_ACCESS_CAP_RO_WITHOUT_DEL                        0x0001U
+#define    MTP_ACCESS_CAP_RO_WITH_DEL                           0x0002U
 
 /* MTP standard data types supported */
 #define    MTP_DATATYPE_INT8                                    0x0001U
@@ -411,24 +427,31 @@ extern "C" {
   * @}
   */
 
-static const uint16_t SuppOP[] = { MTP_OP_GET_DEVICE_INFO, MTP_OP_OPEN_SESSION, MTP_OP_CLOSE_SESSION, MTP_OP_GET_STORAGE_IDS, MTP_OP_GET_STORAGE_INFO,
-                                   MTP_OP_GET_NUM_OBJECTS, MTP_OP_GET_OBJECT_HANDLES, MTP_OP_GET_OBJECT_INFO, MTP_OP_GET_OBJECT, MTP_OP_DELETE_OBJECT,
-                                   MTP_OP_SEND_OBJECT_INFO, MTP_OP_SEND_OBJECT,  MTP_OP_GET_DEVICE_PROP_DESC, MTP_OP_GET_DEVICE_PROP_VALUE,
-                                   MTP_OP_SET_OBJECT_PROP_VALUE, MTP_OP_GET_OBJECT_PROP_VALUE, MTP_OP_GET_OBJECT_PROPS_SUPPORTED, MTP_OP_GET_OBJECT_PROPLIST,
+static const uint16_t SuppOP[] = { MTP_OP_GET_DEVICE_INFO, MTP_OP_OPEN_SESSION, MTP_OP_CLOSE_SESSION,
+                                   MTP_OP_GET_STORAGE_IDS, MTP_OP_GET_STORAGE_INFO, MTP_OP_GET_NUM_OBJECTS,
+                                   MTP_OP_GET_OBJECT_HANDLES, MTP_OP_GET_OBJECT_INFO, MTP_OP_GET_OBJECT,
+                                   MTP_OP_DELETE_OBJECT, MTP_OP_SEND_OBJECT_INFO, MTP_OP_SEND_OBJECT,
+                                   MTP_OP_GET_DEVICE_PROP_DESC, MTP_OP_GET_DEVICE_PROP_VALUE,
+                                   MTP_OP_SET_OBJECT_PROP_VALUE, MTP_OP_GET_OBJECT_PROP_VALUE,
+                                   MTP_OP_GET_OBJECT_PROPS_SUPPORTED, MTP_OP_GET_OBJECT_PROPLIST,
                                    MTP_OP_GET_OBJECT_PROP_DESC, MTP_OP_GET_OBJECT_PROP_REFERENCES
                                  };
 
 static const uint16_t SuppEvents[] = {MTP_EVENT_OBJECTADDED};
-static const uint16_t SuppImgFormat[] = {MTP_OBJ_FORMAT_UNDEFINED, MTP_OBJ_FORMAT_TEXT, MTP_OBJ_FORMAT_ASSOCIATION, MTP_OBJ_FORMAT_EXECUTABLE, MTP_OBJ_FORMAT_WAV,
-                                         MTP_OBJ_FORMAT_MP3,  MTP_OBJ_FORMAT_EXIF_JPEG, MTP_OBJ_FORMAT_MPEG, MTP_OBJ_FORMAT_MP4_CONTAINER,
-                                         MTP_OBJ_FORMAT_WINDOWS_IMAGE_FORMAT, MTP_OBJ_FORMAT_PNG, MTP_OBJ_FORMAT_WMA, MTP_OBJ_FORMAT_WMV
+static const uint16_t SuppImgFormat[] = {MTP_OBJ_FORMAT_UNDEFINED, MTP_OBJ_FORMAT_TEXT, MTP_OBJ_FORMAT_ASSOCIATION,
+                                         MTP_OBJ_FORMAT_EXECUTABLE, MTP_OBJ_FORMAT_WAV, MTP_OBJ_FORMAT_MP3,
+                                         MTP_OBJ_FORMAT_EXIF_JPEG, MTP_OBJ_FORMAT_MPEG, MTP_OBJ_FORMAT_MP4_CONTAINER,
+                                         MTP_OBJ_FORMAT_WINDOWS_IMAGE_FORMAT, MTP_OBJ_FORMAT_PNG, MTP_OBJ_FORMAT_WMA,
+                                         MTP_OBJ_FORMAT_WMV
                                         };
 
 static const uint16_t SuppCaptFormat[] = {MTP_OBJ_FORMAT_UNDEFINED, MTP_OBJ_FORMAT_ASSOCIATION, MTP_OBJ_FORMAT_TEXT};
 
-/* required for all object format : storageID, objectFormat, ObjectCompressedSize, persistent unique object identifier, name*/
-static const uint16_t ObjectPropSupp[] = {MTP_OB_PROP_STORAGE_ID, MTP_OB_PROP_OBJECT_FORMAT, MTP_OB_PROP_OBJECT_SIZE, MTP_OB_PROP_OBJ_FILE_NAME,
-                                          MTP_OB_PROP_PARENT_OBJECT, MTP_OB_PROP_NAME, MTP_OB_PROP_PERS_UNIQ_OBJ_IDEN, MTP_OB_PROP_PROTECTION_STATUS
+/* required for all object format : storageID, objectFormat, ObjectCompressedSize,
+persistent unique object identifier, name*/
+static const uint16_t ObjectPropSupp[] = {MTP_OB_PROP_STORAGE_ID, MTP_OB_PROP_OBJECT_FORMAT, MTP_OB_PROP_OBJECT_SIZE,
+                                          MTP_OB_PROP_OBJ_FILE_NAME, MTP_OB_PROP_PARENT_OBJECT, MTP_OB_PROP_NAME,
+                                          MTP_OB_PROP_PERS_UNIQ_OBJ_IDEN, MTP_OB_PROP_PROTECTION_STATUS
                                          };
 
 static const uint16_t DevicePropSupp[] = {MTP_DEV_PROP_DEVICE_FRIENDLY_NAME, MTP_DEV_PROP_BATTERY_LEVEL};
@@ -444,7 +467,7 @@ typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint8_t FileName_len;
   uint16_t FileName[MAX_FILE_NAME];
@@ -461,7 +484,7 @@ typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint32_t ObjectPropSupp_len;
   uint16_t ObjectPropSupp[SUPP_OBJ_PROP_LEN];
@@ -472,7 +495,7 @@ __packed typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint16_t StorageType;
   uint16_t FilesystemType;
@@ -501,7 +524,7 @@ typedef union
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint16_t    ObjectPropertyCode;
   uint16_t    DataType;
@@ -516,7 +539,7 @@ __packed typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint32_t   ObjectHandle;
   uint16_t   PropertyCode;
@@ -528,7 +551,7 @@ __packed typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint32_t MTP_Properties_len;
   MTP_PropertiesTypedef MTP_Properties[SUPP_OBJ_PROP_LEN];
@@ -539,7 +562,7 @@ __packed typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint32_t ref_len;
   uint32_t ref[1];
@@ -549,7 +572,7 @@ __packed typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint16_t     DevicePropertyCode;
   uint16_t     DataType;
@@ -566,7 +589,7 @@ __packed typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint16_t       StandardVersion;
   uint32_t       VendorExtensionID;
@@ -574,22 +597,22 @@ __packed typedef struct
   uint8_t        VendorExtensionDesc_len;
 #if USBD_MTP_VEND_EXT_DESC_SUPPORTED == 1
   uint16_t       VendorExtensionDesc[VEND_EXT_DESC_LEN];
-#endif
+#endif /* USBD_MTP_VEND_EXT_DESC_SUPPORTED */
   uint16_t       FunctionalMode;
   uint32_t       OperationsSupported_len;
   uint16_t       OperationsSupported[SUPP_OP_LEN];
   uint32_t       EventsSupported_len;
 #if USBD_MTP_EVENTS_SUPPORTED == 1
   uint16_t       EventsSupported[SUPP_EVENTS_LEN];
-#endif
+#endif /* USBD_MTP_EVENTS_SUPPORTED */
   uint32_t       DevicePropertiesSupported_len;
 #if USBD_MTP_DEVICE_PROP_SUPPORTED == 1
   uint16_t       DevicePropertiesSupported[SUPP_DEVICE_PROP_LEN];
-#endif
+#endif /* USBD_MTP_DEVICE_PROP_SUPPORTED */
   uint32_t       CaptureFormats_len;
 #if USBD_MTP_CAPTURE_FORMAT_SUPPORTED == 1
   uint16_t       CaptureFormats[SUPP_CAPT_FORMAT_LEN];
-#endif
+#endif /* USBD_MTP_CAPTURE_FORMAT_SUPPORTED */
   uint32_t       ImageFormats_len;
   uint16_t       ImageFormats[SUPP_IMG_FORMAT_LEN];
   uint8_t        Manufacturer_len;

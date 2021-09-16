@@ -27,8 +27,8 @@
 static SC_State SCState = SC_POWER_OFF;
 
 /* APDU Transport Structures */
-SC_ADPU_Commands SC_ADPU;
-SC_ADPU_Response SC_Response;
+SC_ADPU_CommandsTypeDef SC_ADPU;
+SC_ADPU_ResponseTypeDef SC_Response;
 SC_Param_t  SC_Param;
 Protocol_01_DataTypeDef ProtocolData;
 

@@ -20,6 +20,9 @@
 #include "usbd_ctlreq.h"
 #include "usbd_ioreq.h"
 
+#ifdef USE_USBD_COMPOSITE
+#include "usbd_composite_builder.h"
+#endif /* USE_USBD_COMPOSITE */
 
 /** @addtogroup STM32_USBD_STATE_DEVICE_LIBRARY
   * @{
@@ -104,7 +107,7 @@ USBD_StatusTypeDef USBD_StdDevReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef
   {
     case USB_REQ_TYPE_CLASS:
     case USB_REQ_TYPE_VENDOR:
-      ret = (USBD_StatusTypeDef)pdev->pClass->Setup(pdev, req);
+      ret = (USBD_StatusTypeDef)pdev->pClass[pdev->classId]->Setup(pdev, req);
       break;
 
     case USB_REQ_TYPE_STANDARD:
@@ -162,6 +165,7 @@ USBD_StatusTypeDef USBD_StdDevReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef
 USBD_StatusTypeDef USBD_StdItfReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
   USBD_StatusTypeDef ret = USBD_OK;
+  uint8_t idx;
 
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
@@ -176,7 +180,27 @@ USBD_StatusTypeDef USBD_StdItfReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef
 
           if (LOBYTE(req->wIndex) <= USBD_MAX_NUM_INTERFACES)
           {
-            ret = (USBD_StatusTypeDef)pdev->pClass->Setup(pdev, req);
+            /* Get the class index relative to this interface */
+            idx = USBD_CoreFindIF(pdev, LOBYTE(req->wIndex));
+            if (((uint8_t)idx != 0xFFU) && (idx < USBD_MAX_SUPPORTED_CLASS))
+            {
+              /* Call the class data out function to manage the request */
+              if (pdev->pClass[idx]->Setup != NULL)
+              {
+                pdev->classId = idx;
+                ret = (USBD_StatusTypeDef)(pdev->pClass[idx]->Setup(pdev, req));
+              }
+              else
+              {
+                /* should never reach this condition */
+                ret = USBD_FAIL;
+              }
+            }
+            else
+            {
+              /* No relative interface found */
+              ret = USBD_FAIL;
+            }
 
             if ((req->wLength == 0U) && (ret == USBD_OK))
             {
@@ -214,14 +238,26 @@ USBD_StatusTypeDef USBD_StdEPReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 {
   USBD_EndpointTypeDef *pep;
   uint8_t ep_addr;
+  uint8_t idx;
   USBD_StatusTypeDef ret = USBD_OK;
+
   ep_addr = LOBYTE(req->wIndex);
 
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
     case USB_REQ_TYPE_CLASS:
     case USB_REQ_TYPE_VENDOR:
-      ret = (USBD_StatusTypeDef)pdev->pClass->Setup(pdev, req);
+      /* Get the class index relative to this endpoint */
+      idx = USBD_CoreFindEP(pdev, ep_addr);
+      if (((uint8_t)idx != 0xFFU) && (idx < USBD_MAX_SUPPORTED_CLASS))
+      {
+        pdev->classId = idx;
+        /* Call the class data out function to manage the request */
+        if (pdev->pClass[idx]->Setup != NULL)
+        {
+          ret = (USBD_StatusTypeDef)pdev->pClass[idx]->Setup(pdev, req);
+        }
+      }
       break;
 
     case USB_REQ_TYPE_STANDARD:
@@ -284,7 +320,18 @@ USBD_StatusTypeDef USBD_StdEPReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
                   (void)USBD_LL_ClearStallEP(pdev, ep_addr);
                 }
                 (void)USBD_CtlSendStatus(pdev);
-                ret = (USBD_StatusTypeDef)pdev->pClass->Setup(pdev, req);
+
+                /* Get the class index relative to this interface */
+                idx = USBD_CoreFindEP(pdev, ep_addr);
+                if (((uint8_t)idx != 0xFFU) && (idx < USBD_MAX_SUPPORTED_CLASS))
+                {
+                  pdev->classId = idx;
+                  /* Call the class data out function to manage the request */
+                  if (pdev->pClass[idx]->Setup != NULL)
+                  {
+                    ret = (USBD_StatusTypeDef)(pdev->pClass[idx]->Setup(pdev, req));
+                  }
+                }
               }
               break;
 
@@ -396,7 +443,7 @@ static void USBD_GetDescriptor(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
         err++;
       }
       break;
-#endif
+#endif /* (USBD_LPM_ENABLED == 1U) || (USBD_CLASS_BOS_ENABLED == 1U) */
     case USB_DESC_TYPE_DEVICE:
       pbuf = pdev->pDesc->GetDeviceDescriptor(pdev->dev_speed, &len);
       break;
@@ -404,12 +451,30 @@ static void USBD_GetDescriptor(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
     case USB_DESC_TYPE_CONFIGURATION:
       if (pdev->dev_speed == USBD_SPEED_HIGH)
       {
-        pbuf = pdev->pClass->GetHSConfigDescriptor(&len);
+#ifdef USE_USBD_COMPOSITE
+        if ((uint8_t)(pdev->NumClasses) > 0U)
+        {
+          pbuf   = (uint8_t *)USBD_CMPSIT.GetHSConfigDescriptor(&len);
+        }
+        else
+#endif /* USE_USBD_COMPOSITE */
+        {
+          pbuf = (uint8_t *)pdev->pClass[0]->GetHSConfigDescriptor(&len);
+        }
         pbuf[1] = USB_DESC_TYPE_CONFIGURATION;
       }
       else
       {
-        pbuf = pdev->pClass->GetFSConfigDescriptor(&len);
+#ifdef USE_USBD_COMPOSITE
+        if ((uint8_t)(pdev->NumClasses) > 0U)
+        {
+          pbuf   = (uint8_t *)USBD_CMPSIT.GetFSConfigDescriptor(&len);
+        }
+        else
+#endif /* USE_USBD_COMPOSITE */
+        {
+          pbuf   = (uint8_t *)pdev->pClass[0]->GetFSConfigDescriptor(&len);
+        }
         pbuf[1] = USB_DESC_TYPE_CONFIGURATION;
       }
       break;
@@ -491,16 +556,28 @@ static void USBD_GetDescriptor(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
 
         default:
 #if (USBD_SUPPORT_USER_STRING_DESC == 1U)
-          if (pdev->pClass->GetUsrStrDescriptor != NULL)
+          pbuf = NULL;
+
+
+          for (uint32_t idx = 0U; (idx < pdev->NumClasses); idx++)
           {
-            pbuf = pdev->pClass->GetUsrStrDescriptor(pdev, (req->wValue), &len);
+            if (pdev->pClass[idx]->GetUsrStrDescriptor != NULL)
+            {
+              pdev->classId = idx;
+              pbuf = pdev->pClass[idx]->GetUsrStrDescriptor(pdev, LOBYTE(req->wValue), &len);
+
+              if (pbuf == NULL) /* This means that no class recognized the string index */
+              {
+                continue;
+              }
+              else
+              {
+                break;
+              }
+            }
           }
-          else
-          {
-            USBD_CtlError(pdev, req);
-            err++;
-          }
-#endif
+
+#endif /* USBD_SUPPORT_USER_STRING_DESC  */
 
 #if (USBD_CLASS_USER_STRING_DESC == 1U)
           if (pdev->pDesc->GetUserStrDescriptor != NULL)
@@ -512,12 +589,12 @@ static void USBD_GetDescriptor(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
             USBD_CtlError(pdev, req);
             err++;
           }
-#endif
+#endif /* USBD_SUPPORT_USER_STRING_DESC  */
 
 #if ((USBD_CLASS_USER_STRING_DESC == 0U) && (USBD_SUPPORT_USER_STRING_DESC == 0U))
           USBD_CtlError(pdev, req);
           err++;
-#endif
+#endif /* (USBD_CLASS_USER_STRING_DESC == 0U) && (USBD_SUPPORT_USER_STRING_DESC == 0U) */
           break;
       }
       break;
@@ -525,7 +602,16 @@ static void USBD_GetDescriptor(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
     case USB_DESC_TYPE_DEVICE_QUALIFIER:
       if (pdev->dev_speed == USBD_SPEED_HIGH)
       {
-        pbuf = pdev->pClass->GetDeviceQualifierDescriptor(&len);
+#ifdef USE_USBD_COMPOSITE
+        if ((uint8_t)(pdev->NumClasses) > 0U)
+        {
+          pbuf = (uint8_t *)USBD_CMPSIT.GetDeviceQualifierDescriptor(&len);
+        }
+        else
+#endif /* USE_USBD_COMPOSITE */
+        {
+          pbuf = (uint8_t *)pdev->pClass[0]->GetDeviceQualifierDescriptor(&len);
+        }
       }
       else
       {
@@ -537,7 +623,16 @@ static void USBD_GetDescriptor(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
     case USB_DESC_TYPE_OTHER_SPEED_CONFIGURATION:
       if (pdev->dev_speed == USBD_SPEED_HIGH)
       {
-        pbuf = pdev->pClass->GetOtherSpeedConfigDescriptor(&len);
+#ifdef USE_USBD_COMPOSITE
+        if ((uint8_t)(pdev->NumClasses) > 0U)
+        {
+          pbuf = (uint8_t *)USBD_CMPSIT.GetOtherSpeedConfigDescriptor(&len);
+        }
+        else
+#endif /* USE_USBD_COMPOSITE */
+        {
+          pbuf = (uint8_t *)pdev->pClass[0]->GetOtherSpeedConfigDescriptor(&len);
+        }
         pbuf[1] = USB_DESC_TYPE_OTHER_SPEED_CONFIGURATION;
       }
       else
@@ -650,6 +745,7 @@ static USBD_StatusTypeDef USBD_SetConfig(USBD_HandleTypeDef *pdev, USBD_SetupReq
         if (ret != USBD_OK)
         {
           USBD_CtlError(pdev, req);
+          pdev->dev_state = USBD_STATE_ADDRESSED;
         }
         else
         {
@@ -766,7 +862,7 @@ static void USBD_GetStatus(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
       pdev->dev_config_status = USB_CONFIG_SELF_POWERED;
 #else
       pdev->dev_config_status = 0U;
-#endif
+#endif /* USBD_SELF_POWERED */
 
       if (pdev->dev_remote_wakeup != 0U)
       {
@@ -796,6 +892,15 @@ static void USBD_SetFeature(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
   {
     pdev->dev_remote_wakeup = 1U;
     (void)USBD_CtlSendStatus(pdev);
+  }
+  else if (req->wValue == USB_FEATURE_TEST_MODE)
+  {
+    pdev->dev_test_mode = req->wIndex >> 8;
+    (void)USBD_CtlSendStatus(pdev);
+  }
+  else
+  {
+    USBD_CtlError(pdev, req);
   }
 }
 

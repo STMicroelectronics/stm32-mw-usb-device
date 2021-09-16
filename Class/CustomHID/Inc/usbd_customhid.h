@@ -40,17 +40,21 @@ extern "C" {
 /** @defgroup USBD_CUSTOM_HID_Exported_Defines
   * @{
   */
+#ifndef CUSTOM_HID_EPIN_ADDR
 #define CUSTOM_HID_EPIN_ADDR                         0x81U
+#endif /* CUSTOM_HID_EPIN_ADDR */
 
 #ifndef CUSTOM_HID_EPIN_SIZE
 #define CUSTOM_HID_EPIN_SIZE                         0x02U
-#endif
+#endif /* CUSTOM_HID_EPIN_SIZE */
 
+#ifndef CUSTOM_HID_EPOUT_ADDR
 #define CUSTOM_HID_EPOUT_ADDR                        0x01U
+#endif /* CUSTOM_HID_EPOUT_ADDR */
 
 #ifndef CUSTOM_HID_EPOUT_SIZE
 #define CUSTOM_HID_EPOUT_SIZE                        0x02U
-#endif
+#endif /* CUSTOM_HID_EPOUT_SIZE*/
 
 #define USB_CUSTOM_HID_CONFIG_DESC_SIZ               41U
 #define USB_CUSTOM_HID_DESC_SIZ                      9U
@@ -114,6 +118,23 @@ typedef struct
   uint32_t IsReportAvailable;
   CUSTOM_HID_StateTypeDef state;
 } USBD_CUSTOM_HID_HandleTypeDef;
+
+/*
+ * HID Class specification version 1.1
+ * 6.2.1 HID Descriptor
+ */
+
+typedef struct
+{
+  uint8_t           bLength;
+  uint8_t           bDescriptorTypeCHID;
+  uint16_t          bcdCUSTOM_HID;
+  uint8_t           bCountryCode;
+  uint8_t           bNumDescriptors;
+  uint8_t           bDescriptorType;
+  uint16_t          wItemLength;
+} __PACKED USBD_DescTypeDef;
+
 /**
   * @}
   */

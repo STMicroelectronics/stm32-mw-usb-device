@@ -86,8 +86,7 @@ typedef struct
   uint8_t  bCBLength;
   uint8_t  CB[16];
   uint8_t  ReservedForAlign;
-}
-USBD_MSC_BOT_CBWTypeDef;
+} USBD_MSC_BOT_CBWTypeDef;
 
 
 typedef struct
@@ -97,8 +96,7 @@ typedef struct
   uint32_t dDataResidue;
   uint8_t  bStatus;
   uint8_t  ReservedForAlign[3];
-}
-USBD_MSC_BOT_CSWTypeDef;
+} USBD_MSC_BOT_CSWTypeDef;
 
 /**
   * @}

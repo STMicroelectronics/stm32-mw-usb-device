@@ -54,7 +54,7 @@ __IO uint8_t IMSI_Content[9] = {0x01, 0x02, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 
 static uint32_t D_Table[16] = {0, 1, 2, 4, 8, 16, 32, 64, 12, 20, 0, 0, 0, 0, 0, 0};
 
 /* Global variables definition and initialization ----------------------------*/
-SC_ATR SC_A2R;
+SC_ATRTypeDef SC_A2R;
 uint8_t SC_ATR_Table[40];
 uint8_t ProtocolNUM_OUT;
 
@@ -63,7 +63,7 @@ static void SC_Init(void);
 static void SC_DeInit(void);
 static void SC_AnswerReq(SC_State *SC_state, uint8_t *card, uint8_t length);  /* Ask ATR */
 static uint8_t SC_decode_Answer2reset(uint8_t *card);  /* Decode ATR */
-static void SC_SendData(SC_ADPU_Commands *SCADPU, SC_ADPU_Response *SC_ResponseStatus);
+static void SC_SendData(SC_ADPU_CommandsTypeDef *SCADPU, SC_ADPU_ResponseTypeDef *SC_ResponseStatus);
 /* static void SC_Reset(GPIO_PinState ResetState); */
 
 /* Private functions ---------------------------------------------------------*/
@@ -77,7 +77,7 @@ static void SC_SendData(SC_ADPU_Commands *SCADPU, SC_ADPU_Response *SC_ResponseS
   * @param  SC_Response: pointer to a SC_ADPU_Response structure which will be initialized.
   * @retval None
   */
-void SC_Handler(SC_State *SCState, SC_ADPU_Commands *SC_ADPU, SC_ADPU_Response *SC_Response)
+void SC_Handler(SC_State *SCState, SC_ADPU_CommandsTypeDef *SC_ADPU, SC_ADPU_ResponseTypeDef *SC_Response)
 {
   uint32_t i, j;
 
@@ -110,7 +110,7 @@ void SC_Handler(SC_State *SCState, SC_ADPU_Commands *SC_ADPU, SC_ADPU_Response *
 
         for (i = 0U; i < HIST_LENGTH; i++)
         {
-          SC_A2R.H[i] = 0U;
+          SC_A2R.Historical[i] = 0U;
         }
 
         SC_A2R.Tlength = 0U;
@@ -245,7 +245,7 @@ void SC_PTSConfig(void)
   * @param  SC_Response: pointer to a SC_ADPU_Response structure which will be initialized.
   * @retval None
   */
-static void SC_SendData(SC_ADPU_Commands *SCADPU, SC_ADPU_Response *SC_ResponseStatus)
+static void SC_SendData(SC_ADPU_CommandsTypeDef *SCADPU, SC_ADPU_ResponseTypeDef *SC_ResponseStatus)
 {
   uint8_t i;
   uint8_t SC_Command[5];
@@ -391,7 +391,7 @@ static uint8_t SC_decode_Answer2reset(uint8_t *card)
 
   for (i = 0U; i < SC_A2R.Hlength; i++)
   {
-    SC_A2R.H[i] = card[i + 2U + SC_A2R.Tlength];
+    SC_A2R.Historical[i] = card[i + 2U + SC_A2R.Tlength];
   }
   /*************************************TCK Decode*******************************/
   SC_A2R.TCK = card[SC_A2R.Hlength + 2U + SC_A2R.Tlength];

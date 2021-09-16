@@ -124,7 +124,7 @@ USBD_ClassTypeDef USBD_TEMPLATE_ClassDriver =
 
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma data_alignment=4
-#endif
+#endif /* __ICCARM__ */
 /* USB TEMPLATE device Configuration Descriptor */
 __ALIGN_BEGIN static uint8_t USBD_TEMPLATE_CfgDesc[USB_TEMPLATE_CONFIG_DESC_SIZ] __ALIGN_END =
 {
@@ -146,7 +146,7 @@ __ALIGN_BEGIN static uint8_t USBD_TEMPLATE_CfgDesc[USB_TEMPLATE_CONFIG_DESC_SIZ]
 
 #if defined ( __ICCARM__ ) /*!< IAR Compiler */
 #pragma data_alignment=4
-#endif
+#endif /* __ICCARM__ */
 /* USB Standard Device Descriptor */
 __ALIGN_BEGIN static uint8_t USBD_TEMPLATE_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_DESC] __ALIGN_END =
 {
@@ -252,12 +252,12 @@ static uint8_t *USBD_TEMPLATE_GetCfgDesc(uint16_t *length)
 }
 
 /**
-  * @brief  DeviceQualifierDescriptor
+  * @brief  USBD_TEMPLATE_GetDeviceQualifierDesc
   *         return Device Qualifier descriptor
   * @param  length : pointer data length
   * @retval pointer to descriptor buffer
   */
-uint8_t *USBD_TEMPLATE_DeviceQualifierDescriptor(uint16_t *length)
+uint8_t *USBD_TEMPLATE_GetDeviceQualifierDesc(uint16_t *length)
 {
   *length = (uint16_t)sizeof(USBD_TEMPLATE_DeviceQualifierDesc);
   return USBD_TEMPLATE_DeviceQualifierDesc;
@@ -348,19 +348,6 @@ static uint8_t USBD_TEMPLATE_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
 
   return (uint8_t)USBD_OK;
-}
-
-/**
-  * @brief  DeviceQualifierDescriptor
-  *         return Device Qualifier descriptor
-  * @param  length : pointer data length
-  * @retval pointer to descriptor buffer
-  */
-uint8_t *USBD_TEMPLATE_GetDeviceQualifierDesc(uint16_t *length)
-{
-  *length = (uint16_t)sizeof(USBD_TEMPLATE_DeviceQualifierDesc);
-
-  return USBD_TEMPLATE_DeviceQualifierDesc;
 }
 
 /**

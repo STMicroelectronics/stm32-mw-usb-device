@@ -140,7 +140,7 @@ extern USBD_ClassTypeDef  USBD_BB;
 #if (USBD_CLASS_BOS_ENABLED == 1)
 void *USBD_BB_GetCapDesc(USBD_HandleTypeDef *pdev, uint8_t *buf);
 void *USBD_BB_GetAltModeDesc(USBD_HandleTypeDef *pdev, uint8_t *buf, uint8_t idx);
-#endif
+#endif /* (USBD_CLASS_BOS_ENABLED == 1) */
 
 /**
   * @}

@@ -52,6 +52,14 @@ extern "C" {
 #define USBD_DFU_APP_DEFAULT_ADD       0x08008000U /* The first sector (32 KB) is reserved for DFU code */
 #endif /* USBD_DFU_APP_DEFAULT_ADD */
 
+#ifndef USBD_DFU_BM_ATTRIBUTES
+#define USBD_DFU_BM_ATTRIBUTES         0x0BU
+#endif /* USBD_DFU_BM_ATTRIBUTES */
+
+#ifndef USBD_DFU_DETACH_TIMEOUT
+#define USBD_DFU_DETACH_TIMEOUT        0xFFU
+#endif /* USBD_DFU_DETACH_TIMEOUT */
+
 #define USB_DFU_CONFIG_DESC_SIZ        (18U + (9U * USBD_DFU_MAX_ITF_NUM))
 #define USB_DFU_DESC_SIZ               9U
 
@@ -114,7 +122,8 @@ extern "C" {
 /* Other defines                                  */
 /**************************************************/
 /* Bit Detach capable = bit 3 in bmAttributes field */
-#define DFU_DETACH_MASK                (1U << 4)
+#define DFU_DETACH_MASK                (1U << 3)
+#define DFU_MANIFEST_MASK              (1U << 2)
 #define DFU_STATUS_DEPTH               6U
 
 typedef enum
@@ -185,6 +194,17 @@ typedef struct
   uint8_t *(* Read)(uint8_t *src, uint8_t *dest, uint32_t Len);
   uint16_t (* GetStatus)(uint32_t Add, uint8_t cmd, uint8_t *buff);
 } USBD_DFU_MediaTypeDef;
+
+typedef struct
+{
+  uint8_t           bLength;
+  uint8_t           bDescriptorType;
+  uint8_t           bmAttributes;
+  uint16_t          wDetachTimeout;
+  uint16_t          wTransferSze;
+  uint16_t          bcdDFUVersion;
+} __PACKED USBD_DFUFuncDescTypeDef;
+
 /**
   * @}
   */

@@ -30,7 +30,7 @@ extern "C" {
 
 #ifndef __USBD_CCID_SMARTCARD_H
 #include "usbd_ccid_smartcard_template.h"
-#endif
+#endif /* __USBD_CCID_SMARTCARD_H */
 
 /* Exported defines ----------------------------------------------------------*/
 
@@ -49,11 +49,11 @@ extern "C" {
 #define BOTH_DIR                                          2U
 
 /************ Value of the Interrupt transfer status to set ******************/
-#define IntrStatus_Complete                               1U
-#define IntrStatus_Reset                                  0U
+#define INTRSTATUS_COMPLETE                               1U
+#define INTRSTATUS_RESET                                  0U
 /************** slot change status *******************************************/
-#define SlotStatus_Changed                                1U
-#define SlotStatus_Reset                                  0U
+#define SLOTSTATUS_CHANGED                                1U
+#define SLOTSTATUS_RESET                                  0U
 
 /* Exported types ------------------------------------------------------------*/
 extern USBD_HandleTypeDef USBD_Device;

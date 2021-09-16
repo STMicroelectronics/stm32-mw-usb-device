@@ -59,7 +59,11 @@ USBD_CCID_ItfTypeDef USBD_CCID_If_fops =
   */
 uint8_t CCID_Init(USBD_HandleTypeDef  *pdev)
 {
+#ifdef USE_USBD_COMPOSITE
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+#else
   USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+#endif /* USE_USBD_COMPOSITE */
 
   /* CCID Related Initialization */
 
@@ -76,8 +80,11 @@ uint8_t CCID_Init(USBD_HandleTypeDef  *pdev)
   */
 uint8_t CCID_DeInit(USBD_HandleTypeDef  *pdev)
 {
-
+#ifdef USE_USBD_COMPOSITE
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+#else
   USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+#endif /* USE_USBD_COMPOSITE */
 
   hccid->blkt_state = CCID_STATE_IDLE;
 
@@ -94,7 +101,12 @@ uint8_t CCID_DeInit(USBD_HandleTypeDef  *pdev)
   */
 static uint8_t CCID_ControlReq(uint8_t req, uint8_t *pbuf, uint16_t *length)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)(USBD_Device.pClassData);
+#ifdef USE_USBD_COMPOSITE
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)USBD_Device.pClassDataCmsit[USBD_Device.classId];
+#else
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)USBD_Device.pClassData;
+#endif /* USE_USBD_COMPOSITE */
+
   UNUSED(length);
 
   switch (req)
@@ -105,7 +117,7 @@ static uint8_t CCID_ControlReq(uint8_t req, uint8_t *pbuf, uint16_t *length)
       hccid->slot_nb = ((uint16_t) * pbuf & 0x0fU);
       hccid->seq_nb = (((uint16_t) * pbuf & 0xf0U) >> 8);
 
-      if (CCID_CmdAbort((uint8_t)hccid->slot_nb, (uint8_t)hccid->seq_nb) != 0U)
+      if (CCID_CmdAbort(&USBD_Device, (uint8_t)hccid->slot_nb, (uint8_t)hccid->seq_nb) != 0U)
       {
         /* If error is returned by lower layer :
         Generally Slot# may not have matched */
@@ -238,7 +250,11 @@ static uint8_t CCID_Response_Process(void)
 uint8_t CCID_SetSlotStatus(USBD_HandleTypeDef *pdev)
 {
   /* Get the CCID handler pointer */
+#ifdef USE_USBD_COMPOSITE
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+#else
   USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+#endif /* USE_USBD_COMPOSITE */
 
   if ((hccid->SlotStatus.SlotStatus) == 1U) /* Transfer Complete Status
                         of previous Interrupt transfer */

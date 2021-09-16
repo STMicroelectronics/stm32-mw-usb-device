@@ -27,11 +27,11 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #ifndef __USBD_CCID_IF_H
 #include "usbd_ccid_if_template.h"
-#endif
+#endif /* __USBD_CCID_IF_H */
 
 #ifndef __USBD_CCID_SC_IF_H
 #include "usbd_ccid_sc_if_template.h"
-#endif
+#endif /* __USBD_CCID_SC_IF_H */
 
 
 /* Exported types ------------------------------------------------------------*/
@@ -53,6 +53,10 @@ extern "C" {
   Then the Slot Error register contains the index of the first bad parameter as a
   positive number (1-127). For instance, if the CCID receives an ICC command to
   an unimplemented slot, then the Slot Error register shall be set to 5 (index of bSlot field) */
+
+/*
+ * CCID Class specification revsion 1.1
+ */
 
 /* Following Parameters used in PC_to_RDR_XfrBlock */
 #define   SLOTERROR_BAD_LENTGH                     0x01U
@@ -97,25 +101,25 @@ extern "C" {
 /* DEFAULT_FIDI_VALUE */
 #ifndef   DEFAULT_FIDI
 #define   DEFAULT_FIDI                             0x11U
-#endif
+#endif /* DEFAULT_FIDI */
 #ifndef   DEFAULT_T01CONVCHECKSUM
 #define   DEFAULT_T01CONVCHECKSUM                  0x00U
-#endif
+#endif /* DEFAULT_T01CONVCHECKSUM */
 #ifndef   DEFAULT_EXTRA_GUARDTIME
 #define   DEFAULT_EXTRA_GUARDTIME                  0x00U
-#endif
+#endif /* DEFAULT_EXTRA_GUARDTIME */
 #ifndef   DEFAULT_WAITINGINTEGER
 #define   DEFAULT_WAITINGINTEGER                   0x0AU
-#endif
+#endif /* DEFAULT_WAITINGINTEGER */
 #ifndef   DEFAULT_CLOCKSTOP
 #define   DEFAULT_CLOCKSTOP                        0x00U
-#endif
+#endif /* DEFAULT_CLOCKSTOP */
 #ifndef   DEFAULT_IFSC
 #define   DEFAULT_IFSC                             0x20U
-#endif
+#endif /* DEFAULT_IFSC */
 #ifndef   DEFAULT_NAD
 #define   DEFAULT_NAD                              0x00U
-#endif
+#endif /* DEFAULT_NAD */
 
 /* Following Parameters used in PC_to_RDR_IccPowerOn */
 #define VOLTAGE_SELECTION_AUTOMATIC               0xFFU
@@ -151,10 +155,9 @@ Offset=6 bmCommandStatus 2 bits 0, 1, 2
 #define SIZE_OF_ATR                                19U
 #else
 #define SIZE_OF_ATR                                15U
-#endif
+#endif /* (ATR_T01 == 0) */
 
 /* defines for the CCID_CMD Layers */
-#define LEN_RDR_TO_PC_SLOTSTATUS                    10U
 #define LEN_PROTOCOL_STRUCT_T0                      5U
 #define LEN_PROTOCOL_STRUCT_T1                      7U
 
@@ -174,8 +177,8 @@ Offset=6 bmCommandStatus 2 bits 0, 1, 2
 
 #define  CHK_PARAM_SLOT                           0x01U
 #define  CHK_PARAM_DWLENGTH                       0x02U
-#define  CHK_PARAM_abRFU2                         0x04U
-#define  CHK_PARAM_abRFU3                         0x08U
+#define  CHK_PARAM_ABRFU2                         0x04U
+#define  CHK_PARAM_ABRFU3                         0x08U
 #define  CHK_PARAM_CARD_PRESENT                   0x10U
 #define  CHK_PARAM_ABORT                          0x20U
 #define  CHK_ACTIVE_STATE                         0x40U
@@ -207,7 +210,7 @@ void RDR_to_PC_DataRateAndClockFrequency(uint8_t errorCode, USBD_HandleTypeDef *
 void CCID_UpdSlotStatus(USBD_HandleTypeDef *pdev, uint8_t slotStatus);
 void CCID_UpdSlotChange(USBD_HandleTypeDef *pdev, uint8_t changeStatus);
 uint8_t CCID_IsSlotStatusChange(USBD_HandleTypeDef *pdev);
-uint8_t CCID_CmdAbort(uint8_t slot, uint8_t seq);
+uint8_t CCID_CmdAbort(USBD_HandleTypeDef *pdev, uint8_t slot, uint8_t seq);
 uint8_t USBD_CCID_Transfer_Data_Request(USBD_HandleTypeDef *pdev,
                                         uint8_t *dataPointer, uint16_t dataLen);
 

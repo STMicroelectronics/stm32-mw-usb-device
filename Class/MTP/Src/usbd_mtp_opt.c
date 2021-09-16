@@ -73,7 +73,7 @@ static uint32_t MTP_build_data_proplist(USBD_HandleTypeDef *pdev,
   */
 void USBD_MTP_OPT_CreateObjectHandle(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   if (hmtp->OperationsContainer.Param1 == 0U)   /* Param1 == Session ID*/
   {
@@ -104,12 +104,13 @@ void USBD_MTP_OPT_CreateObjectHandle(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetDeviceInfo(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   if (hmtp->MTP_SessionState == MTP_SESSION_NOT_OPENED)        /* no session opened */
   {
     /* if GetDevice Info called outside a session then SessionID and Transaction_ID shall be 0x00000000*/
-    if ((hmtp->OperationsContainer.Param1 == 0U) && (hmtp->OperationsContainer.trans_id == 0U)) /* Param1 == session ID*/
+    /* Param1 == session ID*/
+    if ((hmtp->OperationsContainer.Param1 == 0U) && (hmtp->OperationsContainer.trans_id == 0U))
     {
       hmtp->ResponseCode = MTP_RESPONSE_OK;
     }
@@ -147,7 +148,7 @@ void USBD_MTP_OPT_GetDeviceInfo(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetStorageIDS(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   hmtp->GenericContainer.code =  MTP_OP_GET_STORAGE_IDS;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
   hmtp->GenericContainer.type = MTP_CONT_TYPE_DATA;
@@ -168,7 +169,7 @@ void USBD_MTP_OPT_GetStorageIDS(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetStorageInfo(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   hmtp->GenericContainer.code =  MTP_OP_GET_STORAGE_INFO;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
   hmtp->GenericContainer.type = MTP_CONT_TYPE_DATA;
@@ -189,7 +190,7 @@ void USBD_MTP_OPT_GetStorageInfo(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectHandle(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   hmtp->GenericContainer.code =  MTP_OP_GET_OBJECT_HANDLES;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
   hmtp->GenericContainer.type = MTP_CONT_TYPE_DATA;
@@ -210,7 +211,7 @@ void USBD_MTP_OPT_GetObjectHandle(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectInfo(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code =  MTP_OP_GET_OBJECT_INFO;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -232,7 +233,7 @@ void USBD_MTP_OPT_GetObjectInfo(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectReferences(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code = MTP_OP_GET_OBJECT_PROP_REFERENCES;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -254,7 +255,7 @@ void USBD_MTP_OPT_GetObjectReferences(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectPropSupp(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code = MTP_OP_GET_OBJECT_PROPS_SUPPORTED;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -276,7 +277,7 @@ void USBD_MTP_OPT_GetObjectPropSupp(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectPropDesc(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code = MTP_OP_GET_OBJECT_PROP_DESC;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -298,7 +299,7 @@ void USBD_MTP_OPT_GetObjectPropDesc(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectPropList(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code = MTP_OP_GET_OBJECT_PROPLIST;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -320,7 +321,7 @@ void USBD_MTP_OPT_GetObjectPropList(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObjectPropValue(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code = MTP_OP_GET_OBJECT_PROP_VALUE;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -342,8 +343,8 @@ void USBD_MTP_OPT_GetObjectPropValue(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetObject(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
   hmtp->GenericContainer.length = hmtpif->GetContainerLength(hmtp->OperationsContainer.Param1);
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -360,7 +361,7 @@ void USBD_MTP_OPT_GetObject(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_GetDevicePropDesc(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hmtp->GenericContainer.code = MTP_OP_GET_DEVICE_PROP_DESC;
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
@@ -382,8 +383,8 @@ void USBD_MTP_OPT_GetDevicePropDesc(USBD_HandleTypeDef  *pdev)
   */
 void USBD_MTP_OPT_SendObject(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint32_t len)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   static uint32_t tmp = 0U;
 
   switch (hmtp->RECEIVE_DATA_STATUS)
@@ -443,8 +444,8 @@ void USBD_MTP_OPT_SendObject(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint32_t 
   */
 void USBD_MTP_OPT_SendObjectInfo(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint32_t len)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   MTP_ObjectInfoTypeDef ObjectInfo;
   uint8_t dataLength = offsetof(MTP_ObjectInfoTypeDef, Filename);
   uint8_t *tmp;
@@ -516,8 +517,8 @@ void USBD_MTP_OPT_SendObjectInfo(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint3
   */
 void USBD_MTP_OPT_DeleteObject(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
   hmtp->GenericContainer.type = MTP_CONT_TYPE_RESPONSE;
@@ -534,8 +535,8 @@ void USBD_MTP_OPT_DeleteObject(USBD_HandleTypeDef  *pdev)
   */
 static void MTP_Get_PayloadContent(USBD_HandleTypeDef *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   uint8_t *buffer = hmtp->GenericContainer.data;
   uint32_t i;
   uint32_t n_idx;
@@ -744,7 +745,7 @@ static void MTP_Get_DeviceInfo(void)
   */
 static void MTP_Get_StorageInfo(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
   MTP_StorageInfo.StorageType = MTP_STORAGE_REMOVABLE_RAM;
   MTP_StorageInfo.FilesystemType = MTP_FILESYSTEM_GENERIC_FLAT;
@@ -764,8 +765,8 @@ static void MTP_Get_StorageInfo(USBD_HandleTypeDef  *pdev)
   */
 static void MTP_Get_ObjectHandle(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
   MTP_ObjectHandle.ObjectHandle_len = (uint32_t)(hmtpif->GetIdx(hmtp->OperationsContainer.Param3,
                                                                 MTP_ObjectHandle.ObjectHandle));
@@ -799,7 +800,7 @@ static void MTP_Get_ObjectPropSupp(void)
   */
 static void MTP_Get_ObjectPropDesc(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t undef_format = MTP_OBJ_FORMAT_UNDEFINED;
   uint32_t storageid = MTP_STORAGE_ID;
 
@@ -896,8 +897,8 @@ static void MTP_Get_ObjectPropDesc(USBD_HandleTypeDef  *pdev)
   */
 static uint8_t *MTP_Get_ObjectPropValue(USBD_HandleTypeDef *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   static uint8_t buf[512];
 
   /* Add all other supported object properties */
@@ -950,8 +951,8 @@ static uint8_t *MTP_Get_ObjectPropValue(USBD_HandleTypeDef *pdev)
   */
 static void MTP_Get_ObjectPropList(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
-  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
+  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   uint16_t filename[255];
   uint32_t storageid = MTP_STORAGE_ID;
   uint32_t default_val = 0U;
@@ -990,7 +991,7 @@ static void MTP_Get_ObjectPropList(USBD_HandleTypeDef  *pdev)
         /* MTP_FileName.FileName_len value shall be set before USBD_MTP_FS_GetObjectName */
         MTP_FileName.FileName_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
         hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, MTP_FileName.FileName_len, filename);
-        (void)USBD_memcpy(MTP_FileName.FileName, filename, ((uint32_t)MTP_FileName.FileName_len * 2U) + 1U );
+        (void)USBD_memcpy(MTP_FileName.FileName, filename, ((uint32_t)MTP_FileName.FileName_len * 2U) + 1U);
         MTP_PropertiesList.MTP_Properties[i].propval = (uint8_t *)&MTP_FileName;
         break;
 
@@ -1014,7 +1015,7 @@ static void MTP_Get_ObjectPropList(USBD_HandleTypeDef  *pdev)
         /* MTP_FileName.FileName_len value shall be set before USBD_MTP_FS_GetObjectName */
         MTP_FileName.FileName_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
         hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, MTP_FileName.FileName_len, filename);
-        (void)USBD_memcpy(MTP_FileName.FileName, filename, ((uint32_t)MTP_FileName.FileName_len * 2U) + 1U );
+        (void)USBD_memcpy(MTP_FileName.FileName, filename, ((uint32_t)MTP_FileName.FileName_len * 2U) + 1U);
         MTP_PropertiesList.MTP_Properties[i].propval = (uint8_t *)&MTP_FileName;
         break;
 
@@ -1075,8 +1076,8 @@ static void MTP_Get_DevicePropDesc(void)
   */
 static void MTP_Get_ObjectInfo(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData;
-  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
+  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t filename[255];
 
   MTP_ObjectInfo.Storage_id = MTP_STORAGE_ID;
@@ -1126,7 +1127,7 @@ static void MTP_Get_StorageIDS(void)
   */
 static uint32_t MTP_build_data_propdesc(USBD_HandleTypeDef  *pdev, MTP_ObjectPropDescTypeDef def)
 {
-  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t DefValue_size = (MTP_FileName.FileName_len * 2U) + 1U;
   uint32_t dataLength = offsetof(MTP_ObjectPropDescTypeDef, DefValue);
 
@@ -1185,7 +1186,7 @@ static uint32_t MTP_build_data_propdesc(USBD_HandleTypeDef  *pdev, MTP_ObjectPro
 static uint32_t MTP_build_data_proplist(USBD_HandleTypeDef  *pdev,
                                         MTP_PropertiesListTypedef proplist, uint32_t idx)
 {
-  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t propval_size = (MTP_FileName.FileName_len * 2U) + 1U;
   uint32_t dataLength;
 
@@ -1248,7 +1249,7 @@ static uint32_t MTP_build_data_proplist(USBD_HandleTypeDef  *pdev,
   */
 static uint32_t MTP_build_data_ObjInfo(USBD_HandleTypeDef *pdev, MTP_ObjectInfoTypeDef objinfo)
 {
-  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassData;
+  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint32_t ObjInfo_len = offsetof(MTP_ObjectInfoTypeDef, Filename);
 
   (void)USBD_memcpy(hmtp->GenericContainer.data, (const uint8_t *)&objinfo, ObjInfo_len);

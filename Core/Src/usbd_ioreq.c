@@ -94,7 +94,7 @@ USBD_StatusTypeDef USBD_CtlSendData(USBD_HandleTypeDef *pdev,
   pdev->ep_in[0].rem_length = 0U;
 #else
   pdev->ep_in[0].rem_length = len;
-#endif
+#endif /* USBD_AVOID_PACKET_SPLIT_MPS */
 
   /* Start the transfer */
   (void)USBD_LL_Transmit(pdev, 0x00U, pbuf, len);
@@ -138,7 +138,7 @@ USBD_StatusTypeDef USBD_CtlPrepareRx(USBD_HandleTypeDef *pdev,
   pdev->ep_out[0].rem_length = 0U;
 #else
   pdev->ep_out[0].rem_length = len;
-#endif
+#endif /* USBD_AVOID_PACKET_SPLIT_MPS */
 
   /* Start the transfer */
   (void)USBD_LL_PrepareReceive(pdev, 0U, pbuf, len);

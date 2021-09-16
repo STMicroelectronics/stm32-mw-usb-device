@@ -80,6 +80,8 @@ uint16_t MEM_If_DeInit(void)
   */
 uint16_t MEM_If_Erase(uint32_t Add)
 {
+  UNUSED(Add);
+
   return 0;
 }
 
@@ -92,6 +94,10 @@ uint16_t MEM_If_Erase(uint32_t Add)
   */
 uint16_t MEM_If_Write(uint8_t *src, uint8_t *dest, uint32_t Len)
 {
+  UNUSED(src);
+  UNUSED(dest);
+  UNUSED(Len);
+
   return 0;
 }
 
@@ -104,6 +110,10 @@ uint16_t MEM_If_Write(uint8_t *src, uint8_t *dest, uint32_t Len)
   */
 uint8_t *MEM_If_Read(uint8_t *src, uint8_t *dest, uint32_t Len)
 {
+  UNUSED(src);
+  UNUSED(dest);
+  UNUSED(Len);
+
   /* Return a valid address to avoid HardFault */
   return (uint8_t *)(0);
 }
@@ -117,6 +127,9 @@ uint8_t *MEM_If_Read(uint8_t *src, uint8_t *dest, uint32_t Len)
   */
 uint16_t MEM_If_GetStatus(uint32_t Add, uint8_t Cmd, uint8_t *buffer)
 {
+  UNUSED(Add);
+  UNUSED(buffer);
+
   switch (Cmd)
   {
     case DFU_MEDIA_PROGRAM:

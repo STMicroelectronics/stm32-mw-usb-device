@@ -37,25 +37,25 @@ extern "C" {
 #define SUPP_EVENTS_LEN                                        (uint8_t)((uint8_t)sizeof(SuppEvents) / 2U)
 #else
 #define SUPP_EVENTS_LEN                                         0U
-#endif
+#endif /* USBD_MTP_EVENTS_SUPPORTED */
 
 #if USBD_MTP_VEND_EXT_DESC_SUPPORTED == 1
 #define VEND_EXT_DESC_LEN                                      (sizeof(VendExtDesc) / 2U)
 #else
 #define VEND_EXT_DESC_LEN                                       0U
-#endif
+#endif /* USBD_MTP_VEND_EXT_DESC_SUPPORTED */
 
 #if USBD_MTP_CAPTURE_FORMAT_SUPPORTED  == 1
 #define SUPP_CAPT_FORMAT_LEN                                   (uint8_t)((uint8_t)sizeof(SuppCaptFormat) / 2U)
 #else
 #define SUPP_CAPT_FORMAT_LEN                                    0U
-#endif
+#endif /* USBD_MTP_CAPTURE_FORMAT_SUPPORTED */
 
 #if USBD_MTP_DEVICE_PROP_SUPPORTED == 1
 #define SUPP_DEVICE_PROP_LEN                                   (uint8_t)((uint8_t)sizeof(DevicePropSupp) / 2U)
 #else
 #define SUPP_DEVICE_PROP_LEN                                    0U
-#endif
+#endif /* USBD_MTP_DEVICE_PROP_SUPPORTED */
 
 #define MTP_IF_SCRATCH_BUFF_SZE                                1024U
 
@@ -73,7 +73,8 @@ static const uint16_t VendExtDesc[] = {'m', 'i', 'c', 'r', 'o', 's', 'o', 'f', '
                                       };  /* last 2 bytes must be 0*/
 /*SerialNbr shall be 32 character hexadecimal string for legacy compatibility reasons */
 static const uint16_t SerialNbr[] = {'0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0', '0', '0',
-                                     '1', '0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0', 0
+                                     '1', '0', '0', '0', '0', '1', '0', '0', '0', '0', '1', '0', '0', '0',
+                                     '0', '1', '0', '0', 0
                                     };  /* last 2 bytes must be 0*/
 static const uint16_t DeviceVers[] = {'V', '1', '.', '0', '0', 0}; /* last 2 bytes must be 0*/
 

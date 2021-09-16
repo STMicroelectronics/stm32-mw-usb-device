@@ -113,8 +113,7 @@ typedef struct
 
   __IO uint32_t TxState;
   __IO uint32_t RxState;
-}
-USBD_PRNT_HandleTypeDef;
+} USBD_PRNT_HandleTypeDef;
 
 
 

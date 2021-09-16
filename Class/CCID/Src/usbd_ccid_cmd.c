@@ -25,7 +25,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param_type);
-static void CCID_UpdateCommandStatus(uint8_t cmd_status, uint8_t icc_status);
+static void CCID_UpdateCommandStatus(USBD_HandleTypeDef  *pdev, uint8_t cmd_status, uint8_t icc_status);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -45,7 +45,7 @@ uint8_t PC_to_RDR_IccPowerOn(USBD_HandleTypeDef *pdev)
   Fills the Response buffer with ICC ATR
   This Command is returned with RDR_to_PC_DataBlock();
   */
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t voltage;
   uint8_t sc_voltage = 0U;
   uint8_t index;
@@ -54,7 +54,7 @@ uint8_t PC_to_RDR_IccPowerOn(USBD_HandleTypeDef *pdev)
   hccid->UsbBlkInData.dwLength = 0U;  /* Reset Number of Bytes in abData */
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_DWLENGTH |
-                                  CHK_PARAM_abRFU2 | CHK_PARAM_CARD_PRESENT |
+                                  CHK_PARAM_ABRFU2 | CHK_PARAM_CARD_PRESENT |
                                   CHK_PARAM_ABORT);
   if (error != 0U)
   {
@@ -71,7 +71,7 @@ uint8_t PC_to_RDR_IccPowerOn(USBD_HandleTypeDef *pdev)
   voltage = hccid->UsbBlkOutData.bSpecific_0;
   if (voltage >= VOLTAGE_SELECTION_1V8)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
     return SLOTERROR_BAD_POWERSELECT; /* The Voltage specified is out of Spec */
   }
 
@@ -120,7 +120,7 @@ uint8_t PC_to_RDR_IccPowerOn(USBD_HandleTypeDef *pdev)
       else
       {
         /* Voltage requested from Host was 5V already*/
-        CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_INACTIVE));
+        CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_INACTIVE));
         return error;
       }
     } /* Voltage Selection was automatic */
@@ -128,7 +128,7 @@ uint8_t PC_to_RDR_IccPowerOn(USBD_HandleTypeDef *pdev)
 
   /* ATR is received, No Error Condition Found */
   hccid->UsbBlkInData.dwLength = SIZE_OF_ATR;
-  CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+  CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
 
   for (index = 0U; index < SIZE_OF_ATR; index++)
   {
@@ -150,7 +150,7 @@ uint8_t PC_to_RDR_IccPowerOff(USBD_HandleTypeDef *pdev)
   /*  The response to this command is the RDR_to_PC_SlotStatus*/
   uint8_t error;
 
-  error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_abRFU3 |
+  error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_ABRFU3 |
                                   CHK_PARAM_DWLENGTH);
   if (error != 0U)
   {
@@ -159,11 +159,11 @@ uint8_t PC_to_RDR_IccPowerOff(USBD_HandleTypeDef *pdev)
   /* Command is ok, Check for Card Presence */
   if (SC_Detect() != 0U)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_INACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_INACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_NO_ICC_PRESENT));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_NO_ICC_PRESENT));
   }
 
   /* Power OFF the card */
@@ -183,13 +183,13 @@ uint8_t  PC_to_RDR_GetSlotStatus(USBD_HandleTypeDef *pdev)
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT |  CHK_PARAM_DWLENGTH |
-                                  CHK_PARAM_CARD_PRESENT | CHK_PARAM_abRFU3);
+                                  CHK_PARAM_CARD_PRESENT | CHK_PARAM_ABRFU3);
   if (error != 0U)
   {
     return error;
   }
 
-  CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+  CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   return SLOT_NO_ERROR;
 }
 
@@ -203,13 +203,13 @@ uint8_t  PC_to_RDR_GetSlotStatus(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_to_RDR_XfrBlock(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t expectedLength;
 
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
-                                  CHK_PARAM_abRFU3 | CHK_PARAM_ABORT | CHK_ACTIVE_STATE);
+                                  CHK_PARAM_ABRFU3 | CHK_PARAM_ABORT | CHK_ACTIVE_STATE);
   if (error != 0U)
   {
     return error;
@@ -234,11 +234,11 @@ uint8_t  PC_to_RDR_XfrBlock(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
     error = SLOT_NO_ERROR;
   }
 
@@ -257,12 +257,12 @@ uint8_t  PC_to_RDR_GetParameters(USBD_HandleTypeDef *pdev)
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_DWLENGTH |
-                                  CHK_PARAM_CARD_PRESENT | CHK_PARAM_abRFU3);
+                                  CHK_PARAM_CARD_PRESENT | CHK_PARAM_ABRFU3);
   if (error != 0U)
   {
     return error;
   }
-  CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+  CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
 
   return SLOT_NO_ERROR;
 }
@@ -276,11 +276,11 @@ uint8_t  PC_to_RDR_GetParameters(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_to_RDR_ResetParameters(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_DWLENGTH |
-                                  CHK_PARAM_CARD_PRESENT | CHK_PARAM_abRFU3 |
+                                  CHK_PARAM_CARD_PRESENT | CHK_PARAM_ABRFU3 |
                                   CHK_ACTIVE_STATE);
   if (error != 0U)
   {
@@ -302,11 +302,11 @@ uint8_t  PC_to_RDR_ResetParameters(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
     error = SLOT_NO_ERROR;
   }
 
@@ -321,11 +321,11 @@ uint8_t  PC_to_RDR_ResetParameters(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_to_RDR_SetParameters(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
-                                  CHK_PARAM_abRFU2 | CHK_ACTIVE_STATE);
+                                  CHK_PARAM_ABRFU2 | CHK_ACTIVE_STATE);
   if (error != 0U)
   {
     return error;
@@ -345,7 +345,7 @@ uint8_t  PC_to_RDR_SetParameters(USBD_HandleTypeDef *pdev)
   }
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
 
   (void)USBD_memcpy(&ProtocolData, (void const *)(&hccid->UsbBlkOutData.abData[0]),
@@ -355,11 +355,11 @@ uint8_t  PC_to_RDR_SetParameters(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
     error = SLOT_NO_ERROR;
   }
 
@@ -374,12 +374,12 @@ uint8_t  PC_to_RDR_SetParameters(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_to_RDR_Escape(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
   uint32_t size;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
-                                  CHK_PARAM_abRFU3 | CHK_PARAM_ABORT | CHK_ACTIVE_STATE);
+                                  CHK_PARAM_ABRFU3 | CHK_PARAM_ABORT | CHK_ACTIVE_STATE);
 
   if (error != 0U)
   {
@@ -392,11 +392,11 @@ uint8_t  PC_to_RDR_Escape(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   }
 
   return error;
@@ -410,11 +410,11 @@ uint8_t  PC_to_RDR_Escape(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_to_RDR_IccClock(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
-                                  CHK_PARAM_abRFU2 | CHK_PARAM_DWLENGTH | CHK_ACTIVE_STATE);
+                                  CHK_PARAM_ABRFU2 | CHK_PARAM_DWLENGTH | CHK_ACTIVE_STATE);
   if (error != 0U)
   {
     return error;
@@ -424,7 +424,7 @@ uint8_t  PC_to_RDR_IccClock(USBD_HandleTypeDef *pdev)
   01h Stops Clock in the state shown in the bClockStop field */
   if (hccid->UsbBlkOutData.bSpecific_0 > 1U)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
     return SLOTERROR_BAD_CLOCKCOMMAND;
   }
 
@@ -432,11 +432,11 @@ uint8_t  PC_to_RDR_IccClock(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   }
 
   return error;
@@ -451,17 +451,17 @@ uint8_t  PC_to_RDR_IccClock(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_to_RDR_Abort(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
 
-  error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_abRFU3 |
+  error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_ABRFU3 |
                                   CHK_PARAM_DWLENGTH);
   if (error != 0U)
   {
     return error;
   }
-  (void)CCID_CmdAbort(hccid->UsbBlkOutData.bSlot, hccid->UsbBlkOutData.bSeq);
-  CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+  (void)CCID_CmdAbort(pdev, hccid->UsbBlkOutData.bSlot, hccid->UsbBlkOutData.bSeq);
+  CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   return SLOT_NO_ERROR;
 }
 
@@ -469,13 +469,14 @@ uint8_t  PC_to_RDR_Abort(USBD_HandleTypeDef *pdev)
   * @brief  CCID_CmdAbort
   *         Execute the Abort command from Bulk EP or from Control EP,
   *         This stops all Bulk transfers from host and ICC
+  * @param  pdev: device instance
   * @param  slot: slot number that host wants to abort
   * @param  seq : Seq number for PC_to_RDR_Abort
   * @retval status of the command execution
   */
-uint8_t CCID_CmdAbort(uint8_t slot, uint8_t seq)
+uint8_t CCID_CmdAbort(USBD_HandleTypeDef *pdev, uint8_t slot, uint8_t seq)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)(USBD_Device.pClassData);
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   uint8_t BSlot = hccid->USBD_CCID_Param.bSlot;
   /* This function is called for REQUEST_ABORT & PC_to_RDR_Abort */
@@ -483,7 +484,7 @@ uint8_t CCID_CmdAbort(uint8_t slot, uint8_t seq)
   if (slot >= CCID_NUMBER_OF_SLOTS)
   {
     /* error from CLASS_REQUEST*/
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_NO_ICC_PRESENT));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_NO_ICC_PRESENT));
     return SLOTERROR_BAD_SLOT;
   }
 
@@ -517,7 +518,7 @@ uint8_t CCID_CmdAbort(uint8_t slot, uint8_t seq)
   */
 uint8_t  PC_TO_RDR_T0Apdu(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
@@ -531,7 +532,7 @@ uint8_t  PC_TO_RDR_T0Apdu(USBD_HandleTypeDef *pdev)
     /* Bit 0 is associated with bClassGetResponse
      Bit 1 is associated with bClassEnvelope */
 
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
     return SLOTERROR_BAD_BMCHANGES;
   }
 
@@ -541,11 +542,11 @@ uint8_t  PC_TO_RDR_T0Apdu(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   }
 
   return error;
@@ -560,11 +561,11 @@ uint8_t  PC_TO_RDR_T0Apdu(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_TO_RDR_Mechanical(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
-                                  CHK_PARAM_abRFU2 | CHK_PARAM_DWLENGTH);
+                                  CHK_PARAM_ABRFU2 | CHK_PARAM_DWLENGTH);
   if (error != 0U)
   {
     return error;
@@ -579,7 +580,7 @@ uint8_t  PC_TO_RDR_Mechanical(USBD_HandleTypeDef *pdev)
      05h Unlock Card
     */
 
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
     return SLOTERROR_BAD_BFUNCTION_MECHANICAL;
   }
 
@@ -587,11 +588,11 @@ uint8_t  PC_TO_RDR_Mechanical(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   }
 
   return error;
@@ -607,21 +608,21 @@ uint8_t  PC_TO_RDR_Mechanical(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_TO_RDR_SetDataRateAndClockFrequency(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
   uint32_t clockFrequency;
   uint32_t dataRate;
   uint32_t temp;
 
   error = CCID_CheckCommandParams(pdev, CHK_PARAM_SLOT | CHK_PARAM_CARD_PRESENT |
-                                  CHK_PARAM_abRFU3);
+                                  CHK_PARAM_ABRFU3);
   if (error != 0U)
   {
     return error;
   }
   if (hccid->UsbBlkOutData.dwLength != 0x08U)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
     return SLOTERROR_BAD_LENTGH;
   }
 
@@ -656,7 +657,7 @@ uint8_t  PC_TO_RDR_SetDataRateAndClockFrequency(USBD_HandleTypeDef *pdev)
   if (error != SLOT_NO_ERROR)
   {
     hccid->UsbBlkInData.dwLength = 0;
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
@@ -678,7 +679,7 @@ uint8_t  PC_TO_RDR_SetDataRateAndClockFrequency(USBD_HandleTypeDef *pdev)
 
     (hccid->UsbBlkInData.abData[7])  = (uint8_t)((dataRate & 0xFF000000U) >> 24);
 
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   }
 
   return error;
@@ -693,7 +694,7 @@ uint8_t  PC_TO_RDR_SetDataRateAndClockFrequency(USBD_HandleTypeDef *pdev)
   */
 uint8_t  PC_TO_RDR_Secure(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint8_t error;
   uint8_t bBWI;
   uint16_t wLevelParameter;
@@ -717,7 +718,7 @@ uint8_t  PC_TO_RDR_Secure(USBD_HandleTypeDef *pdev)
     /* TPDU level & short APDU level, wLevelParameter is RFU, = 0000h */
     if (wLevelParameter != 0U)
     {
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
       error = SLOTERROR_BAD_LEVELPARAMETER;
       return error;
     }
@@ -730,11 +731,11 @@ uint8_t  PC_TO_RDR_Secure(USBD_HandleTypeDef *pdev)
 
   if (error != SLOT_NO_ERROR)
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
   }
   else
   {
-    CCID_UpdateCommandStatus((BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_NO_ERROR), (BM_ICC_PRESENT_ACTIVE));
   }
 
   return error;
@@ -754,7 +755,7 @@ uint8_t  PC_TO_RDR_Secure(USBD_HandleTypeDef *pdev)
   */
 void RDR_to_PC_DataBlock(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint32_t length = CCID_RESPONSE_HEADER_SIZE;
 
   hccid->UsbBlkInData.bMessageType = RDR_TO_PC_DATABLOCK;
@@ -786,8 +787,8 @@ void RDR_to_PC_DataBlock(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
   */
 void RDR_to_PC_SlotStatus(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
-  UNUSED(errorCode);
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  uint16_t length = CCID_RESPONSE_HEADER_SIZE;
 
   hccid->UsbBlkInData.bMessageType = RDR_TO_PC_SLOTSTATUS;
   hccid->UsbBlkInData.dwLength = 0U;
@@ -797,9 +798,12 @@ void RDR_to_PC_SlotStatus(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
   02h Clock stopped in state H
   03h Clock stopped in an unknown state */
 
-  (void)USBD_CCID_Transfer_Data_Request(pdev, (uint8_t *)(&hccid->UsbBlkInData),
-                                        LEN_RDR_TO_PC_SLOTSTATUS);
+  if (errorCode == SLOT_NO_ERROR)
+  {
+    length += (uint16_t)hccid->UsbBlkInData.dwLength;
+  }
 
+  (void)USBD_CCID_Transfer_Data_Request(pdev, (uint8_t *)(&hccid->UsbBlkInData), length);
 }
 
 /**
@@ -813,7 +817,7 @@ void RDR_to_PC_SlotStatus(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
   */
 void RDR_to_PC_Parameters(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t length = CCID_RESPONSE_HEADER_SIZE;
 
   hccid->UsbBlkInData.bMessageType = RDR_TO_PC_PARAMETERS;
@@ -824,12 +828,12 @@ void RDR_to_PC_Parameters(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
     if (ProtocolNUM_OUT == 0x00U)
     {
       hccid->UsbBlkInData.dwLength = LEN_PROTOCOL_STRUCT_T0;
-      length += LEN_PROTOCOL_STRUCT_T0;
+      length += (uint16_t)hccid->UsbBlkInData.dwLength;
     }
     else
     {
       hccid->UsbBlkInData.dwLength = LEN_PROTOCOL_STRUCT_T1;
-      length += LEN_PROTOCOL_STRUCT_T1;
+      length += (uint16_t)hccid->UsbBlkInData.dwLength;
     }
   }
   else
@@ -867,7 +871,7 @@ void RDR_to_PC_Parameters(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
   */
 void RDR_to_PC_Escape(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint32_t length = CCID_RESPONSE_HEADER_SIZE;
 
   hccid->UsbBlkInData.bMessageType = RDR_TO_PC_ESCAPE;
@@ -893,7 +897,7 @@ void RDR_to_PC_Escape(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
   */
 void RDR_to_PC_DataRateAndClockFrequency(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint32_t length = CCID_RESPONSE_HEADER_SIZE;
 
   hccid->UsbBlkInData.bMessageType = RDR_TO_PC_DATARATEANDCLOCKFREQUENCY;
@@ -917,7 +921,7 @@ void RDR_to_PC_DataRateAndClockFrequency(uint8_t  errorCode, USBD_HandleTypeDef 
   */
 void RDR_to_PC_NotifySlotChange(USBD_HandleTypeDef  *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   hccid->UsbIntData[OFFSET_INT_BMESSAGETYPE] = RDR_TO_PC_NOTIFYSLOTCHANGE;
 
@@ -948,7 +952,7 @@ void RDR_to_PC_NotifySlotChange(USBD_HandleTypeDef  *pdev)
   */
 void CCID_UpdSlotStatus(USBD_HandleTypeDef *pdev, uint8_t slotStatus)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   hccid->SlotStatus.SlotStatus = slotStatus;
 }
 
@@ -961,7 +965,7 @@ void CCID_UpdSlotStatus(USBD_HandleTypeDef *pdev, uint8_t slotStatus)
   */
 void CCID_UpdSlotChange(USBD_HandleTypeDef *pdev, uint8_t changeStatus)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   hccid->SlotStatus.SlotStatusChange  = changeStatus;
 }
 
@@ -973,20 +977,21 @@ void CCID_UpdSlotChange(USBD_HandleTypeDef *pdev, uint8_t changeStatus)
   */
 uint8_t CCID_IsSlotStatusChange(USBD_HandleTypeDef *pdev)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   return hccid->SlotStatus.SlotStatusChange;
 }
 
 /**
   * @brief  CCID_UpdateCommandStatus
   *         Updates the variable for the BulkIn status
+  * @param  pdev: device instance
   * @param  cmd_status : Command change status from the calling function
   * @param  icc_status : Slot change status from the calling function
   * @retval None
   */
-static void CCID_UpdateCommandStatus(uint8_t cmd_status, uint8_t icc_status)
+static void CCID_UpdateCommandStatus(USBD_HandleTypeDef  *pdev, uint8_t cmd_status, uint8_t icc_status)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)USBD_Device.pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   hccid->UsbBlkInData.bStatus = (cmd_status | icc_status);
 }
 /**
@@ -1000,7 +1005,7 @@ static void CCID_UpdateCommandStatus(uint8_t cmd_status, uint8_t icc_status)
   */
 static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param_type)
 {
-  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassData;
+  USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint32_t parameter;
   uint8_t GetState = SC_GetState();
 
@@ -1019,7 +1024,7 @@ static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param
     if (hccid->UsbBlkOutData.bSlot >= CCID_NUMBER_OF_SLOTS)
     {
       /* Slot requested is more than supported by Firmware */
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_NO_ICC_PRESENT));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_NO_ICC_PRESENT));
       return SLOTERROR_BAD_SLOT;
     }
   }
@@ -1030,7 +1035,7 @@ static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param
     if (SC_Detect() == 0U)
     {
       /* Card is Not detected */
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_NO_ICC_PRESENT));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_NO_ICC_PRESENT));
       return SLOTERROR_ICC_MUTE;
     }
   }
@@ -1040,30 +1045,30 @@ static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param
   {
     if (hccid->UsbBlkOutData.dwLength != 0U)
     {
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
       return SLOTERROR_BAD_LENTGH;
     }
   }
 
   /* abRFU 2 : Reserved for Future Use*/
-  if ((parameter & CHK_PARAM_abRFU2) != 0U)
+  if ((parameter & CHK_PARAM_ABRFU2) != 0U)
   {
 
     if ((hccid->UsbBlkOutData.bSpecific_1 != 0U) || (hccid->UsbBlkOutData.bSpecific_2 != 0U))
     {
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
       return SLOTERROR_BAD_ABRFU_2B;        /* bSpecific_1 */
     }
   }
 
-  if ((parameter & CHK_PARAM_abRFU3) != 0U)
+  if ((parameter & CHK_PARAM_ABRFU3) != 0U)
   {
     /* abRFU 3 : Reserved for Future Use*/
     if ((hccid->UsbBlkOutData.bSpecific_0 != 0U) ||
         (hccid->UsbBlkOutData.bSpecific_1 != 0U) ||
         (hccid->UsbBlkOutData.bSpecific_2 != 0U))
     {
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
       return SLOTERROR_BAD_ABRFU_3B;
     }
   }
@@ -1072,7 +1077,7 @@ static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param
   {
     if (hccid->USBD_CCID_Param.bAbortRequestFlag != 0U)
     {
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_INACTIVE));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_INACTIVE));
       return SLOTERROR_CMD_ABORTED;
     }
   }
@@ -1085,7 +1090,7 @@ static uint8_t CCID_CheckCommandParams(USBD_HandleTypeDef  *pdev, uint32_t param
     if ((GetState != (uint8_t)SC_ACTIVE_ON_T0) && (GetState != (uint8_t)SC_ACTIVE_ON_T1))
     {
       /* Check that from Lower Layers, the SmartCard come to known state */
-      CCID_UpdateCommandStatus((BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_INACTIVE));
+      CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_INACTIVE));
       return SLOTERROR_HW_ERROR;
     }
   }

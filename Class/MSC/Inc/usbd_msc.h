@@ -54,9 +54,13 @@ extern "C" {
 #define BOT_RESET                    0xFF
 #define USB_MSC_CONFIG_DESC_SIZ      32
 
-
+#ifndef MSC_EPIN_ADDR
 #define MSC_EPIN_ADDR                0x81U
+#endif /* MSC_EPIN_ADDR */
+
+#ifndef MSC_EPOUT_ADDR
 #define MSC_EPOUT_ADDR               0x01U
+#endif /* MSC_EPOUT_ADDR */
 
 /**
   * @}
@@ -100,8 +104,7 @@ typedef struct
 
   uint32_t                 scsi_blk_addr;
   uint32_t                 scsi_blk_len;
-}
-USBD_MSC_BOT_HandleTypeDef;
+} USBD_MSC_BOT_HandleTypeDef;
 
 /* Structure for MSC process */
 extern USBD_ClassTypeDef  USBD_MSC;

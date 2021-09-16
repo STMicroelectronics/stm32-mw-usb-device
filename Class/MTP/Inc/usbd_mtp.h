@@ -41,10 +41,15 @@ extern "C" {
 /** @defgroup USBD_MTP_Exported_Defines
   * @{
   */
-
+#ifndef MTP_IN_EP
 #define MTP_IN_EP                                                   0x81U       /* EP1 for data IN */
+#endif /* MTP_IN_EP */
+#ifndef MTP_OUT_EP
 #define MTP_OUT_EP                                                  0x01U       /* EP1 for data OUT */
+#endif /* MTP_OUT_EP */
+#ifndef MTP_CMD_EP
 #define MTP_CMD_EP                                                  0x82U       /* EP2 for MTP commands */
+#endif /* MTP_CMD_EP */
 
 #ifndef MTP_CMD_ITF_NBR
 #define MTP_CMD_ITF_NBR                                             0x00U       /* Command Interface Number 0 */
@@ -116,6 +121,11 @@ extern "C" {
 #define MTP_RESPONSE_INVALID_OBJECT_PROP_CODE                       0xA801U
 #define MTP_RESPONSE_SPECIFICATION_BY_GROUP_UNSUPPORTED             0xA807U
 #define MTP_RESPONSE_OBJECT_PROP_NOT_SUPPORTED                      0xA80AU
+
+/*
+ * MTP Class specification Revision 1.1
+ * Appendix A. Object Formats
+ */
 
 /* MTP Object format codes */
 #define MTP_OBJ_FORMAT_UNDEFINED                                    0x3000U
@@ -220,7 +230,7 @@ typedef struct
   uint32_t Param3;
   uint32_t Param4;
   uint32_t Param5;
-} MTP_OperationsTypedef;
+} MTP_OperationsTypeDef;
 
 typedef struct
 {
@@ -235,7 +245,7 @@ typedef struct
 typedef __PACKED_STRUCT
 #else
 __packed typedef struct
-#endif
+#endif /* __GNUC__ */
 {
   uint32_t Storage_id;
   uint16_t ObjectFormat;
@@ -270,7 +280,7 @@ typedef struct
   MTP_ResponsePhaseTypeDef     MTP_ResponsePhase;
   MTP_SessionStateTypeDef      MTP_SessionState;
   MTP_RECEIVE_DATA_STATUS      RECEIVE_DATA_STATUS;
-  MTP_OperationsTypedef        OperationsContainer;
+  MTP_OperationsTypeDef        OperationsContainer;
   MTP_GenericContainerTypeDef  GenericContainer;
 } USBD_MTP_HandleTypeDef;
 

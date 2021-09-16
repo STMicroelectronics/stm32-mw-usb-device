@@ -30,7 +30,7 @@ extern "C" {
 
 #ifndef __USBD_CCID_SMARTCARD_H
 #include "usbd_ccid_smartcard_template.h"
-#endif
+#endif /* __USBD_CCID_SMARTCARD_H */
 
 /* Exported constants --------------------------------------------------------*/
 /* Exported types ------------------------------------------------------------*/

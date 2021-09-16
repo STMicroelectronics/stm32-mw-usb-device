@@ -42,10 +42,15 @@ extern "C" {
   */
 /* Comment this define in order to disable the CDC ECM Notification pipe */
 
-
+#ifndef CDC_ECM_IN_EP
 #define CDC_ECM_IN_EP                                   0x81U  /* EP1 for data IN */
+#endif /* CDC_ECM_IN_EP */
+#ifndef CDC_ECM_OUT_EP
 #define CDC_ECM_OUT_EP                                  0x01U  /* EP1 for data OUT */
+#endif /* CDC_ECM_OUT_EP */
+#ifndef CDC_ECM_CMD_EP
 #define CDC_ECM_CMD_EP                                  0x82U  /* EP2 for CDC ECM commands */
+#endif /* CDC_ECM_CMD_EP */
 
 #ifndef CDC_ECM_CMD_ITF_NBR
 #define CDC_ECM_CMD_ITF_NBR                             0x00U /* Command Interface Number 0 */
@@ -172,6 +177,26 @@ typedef struct
   uint8_t   data[8];
 } USBD_CDC_ECM_NotifTypeDef;
 
+/*
+ * ECM Class specification revision 1.2
+ * Table 3: Ethernet Networking Functional Descriptor
+ */
+
+typedef struct
+{
+  uint8_t bFunctionLength;
+  uint8_t bDescriptorType;
+  uint8_t bDescriptorSubType;
+  uint8_t iMacAddress;
+  uint8_t bEthernetStatistics3;
+  uint8_t bEthernetStatistics2;
+  uint8_t bEthernetStatistics1;
+  uint8_t bEthernetStatistics0;
+  uint16_t wMaxSegmentSize;
+  uint16_t bNumberMCFiltes;
+  uint8_t bNumberPowerFiltes;
+} __PACKED USBD_ECMFuncDescTypeDef;
+
 typedef struct
 {
   uint32_t data[CDC_ECM_DATA_BUFFER_SIZE / 4U];      /* Force 32-bit alignment */
@@ -193,12 +218,6 @@ typedef struct
   USBD_CDC_ECM_NotifTypeDef   Req;
 } USBD_CDC_ECM_HandleTypeDef;
 
-typedef enum
-{
-  NETWORK_CONNECTION = 0x00,
-  RESPONSE_AVAILABLE = 0x01,
-  CONNECTION_SPEED_CHANGE = 0x2A
-} USBD_CDC_ECM_NotifCodeTypeDef;
 
 /** @defgroup USBD_CORE_Exported_Macros
   * @{
@@ -234,7 +253,7 @@ uint8_t  USBD_CDC_ECM_ReceivePacket(USBD_HandleTypeDef *pdev);
 uint8_t  USBD_CDC_ECM_TransmitPacket(USBD_HandleTypeDef *pdev);
 
 uint8_t  USBD_CDC_ECM_SendNotification(USBD_HandleTypeDef *pdev,
-                                       USBD_CDC_ECM_NotifCodeTypeDef  Notif,
+                                       USBD_CDC_NotifCodeTypeDef  Notif,
                                        uint16_t bVal, uint8_t *pData);
 /**
   * @}

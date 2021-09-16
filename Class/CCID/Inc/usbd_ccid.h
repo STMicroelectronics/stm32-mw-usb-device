@@ -101,28 +101,28 @@ extern "C" {
 
 #ifndef CCID_VOLTAGE_SUPP
 #define CCID_VOLTAGE_SUPP                                     0x07U
-#endif
+#endif /* CCID_VOLTAGE_SUPP */
 #ifndef USBD_CCID_PROTOCOL
 #define USBD_CCID_PROTOCOL                                    0x03U
-#endif
+#endif /* USBD_CCID_PROTOCOL */
 #ifndef USBD_CCID_DEFAULT_CLOCK_FREQ
 #define USBD_CCID_DEFAULT_CLOCK_FREQ                          3600U
-#endif
+#endif /* USBD_CCID_DEFAULT_CLOCK_FREQ */
 #ifndef USBD_CCID_MAX_CLOCK_FREQ
 #define USBD_CCID_MAX_CLOCK_FREQ                              USBD_CCID_DEFAULT_CLOCK_FREQ
-#endif
+#endif /* USBD_CCID_MAX_CLOCK_FREQ */
 #ifndef USBD_CCID_DEFAULT_DATA_RATE
 #define USBD_CCID_DEFAULT_DATA_RATE                           9677U
-#endif
+#endif /* USBD_CCID_DEFAULT_DATA_RATE */
 #ifndef USBD_CCID_MAX_DATA_RATE
 #define USBD_CCID_MAX_DATA_RATE                               USBD_CCID_DEFAULT_DATA_RATE
-#endif
+#endif /* USBD_CCID_MAX_DATA_RATE */
 #ifndef USBD_CCID_MAX_INF_FIELD_SIZE
 #define USBD_CCID_MAX_INF_FIELD_SIZE                          254U
-#endif
+#endif /* USBD_CCID_MAX_INF_FIELD_SIZE */
 #ifndef CCID_MAX_BLOCK_SIZE_HEADER
 #define CCID_MAX_BLOCK_SIZE_HEADER                            271U
-#endif
+#endif /* CCID_MAX_BLOCK_SIZE_HEADER */
 
 #define TPDU_EXCHANGE                                         0x01U
 #define SHORT_APDU_EXCHANGE                                   0x02U
@@ -131,20 +131,24 @@ extern "C" {
 
 #ifndef EXCHANGE_LEVEL_FEATURE
 #define EXCHANGE_LEVEL_FEATURE                               TPDU_EXCHANGE
-#endif
+#endif /* EXCHANGE_LEVEL_FEATURE */
 
 #define CCID_ENDPOINT_DESC_SIZE                               0x07U
 
 #ifndef CCID_EP0_BUFF_SIZ
 #define CCID_EP0_BUFF_SIZ                                     64U
-#endif
+#endif /* CCID_EP0_BUFF_SIZ */
 
 #ifndef CCID_BULK_EPIN_SIZE
 #define CCID_BULK_EPIN_SIZE                                   64U
-#endif
+#endif /* CCID_BULK_EPIN_SIZE */
 
 #define CCID_INT_BUFF_SIZ                                     2U
 /*---------------------------------------------------------------------*/
+/*
+ * CCID Class specification revision 1.1
+ * Command Pipe. Bulk Messages
+ */
 
 /* CCID Bulk Out Command definitions */
 #define PC_TO_RDR_ICCPOWERON                                  0x62U
@@ -213,7 +217,6 @@ typedef struct
   uint8_t  datatype;
 } USBD_CCID_LineCodingTypeDef;
 
-#pragma pack(1)
 typedef struct
 {
   uint8_t bMessageType; /* Offset = 0*/
@@ -230,10 +233,8 @@ typedef struct
                            or for a TPDU T=1 block is 259 bytes,
                            or for a short APDU T=1 block is 261 bytes,
                            or for an extended APDU T=1 block is 65544 bytes.*/
-} USBD_CCID_BulkOut_DataTypeDef;
-#pragma pack()
+} __PACKED USBD_CCID_BulkOut_DataTypeDef;
 
-#pragma pack(1)
 typedef struct
 {
   uint8_t bMessageType;   /* Offset = 0 */
@@ -245,8 +246,7 @@ typedef struct
   uint8_t bSpecific;      /* Offset = 9 */
   uint8_t abData[ABDATA_SIZE]; /* Offset = 10 */
   uint16_t u16SizeToSend;
-} USBD_CCID_BulkIn_DataTypeDef;
-#pragma pack()
+} __PACKED USBD_CCID_BulkIn_DataTypeDef;
 
 typedef struct
 {
@@ -262,6 +262,36 @@ typedef struct
   __IO uint8_t bSlot;
 } USBD_CCID_ParamTypeDef;
 
+/*
+ * CCID Class specification revsion 1.1
+ * Smart Card Device Class Descriptor Table
+ */
+
+typedef struct
+{
+  uint8_t           bLength;
+  uint8_t           bDescriptorType;
+  uint16_t          bcdCCID;
+  uint8_t           bMaxSlotIndex;
+  uint8_t           bVoltageSupport;
+  uint32_t          dwProtocols;
+  uint32_t          dwDefaultClock;
+  uint32_t          dwMaximumClock;
+  uint8_t           bNumClockSupported;
+  uint32_t          dwDataRate;
+  uint32_t          dwMaxDataRate;
+  uint8_t           bNumDataRatesSupported;
+  uint32_t          dwMaxIFSD;
+  uint32_t          dwSynchProtocols;
+  uint32_t          dwMechanical;
+  uint32_t          dwFeatures;
+  uint32_t          dwMaxCCIDMessageLength;
+  uint8_t           bClassGetResponse;
+  uint8_t           bClassEnvelope;
+  uint16_t          wLcdLayout;
+  uint8_t           bPINSupport;
+  uint8_t           bMaxCCIDBusySlots;
+} __PACKED USBD_CCID_DescTypeDef;
 
 typedef struct
 {
