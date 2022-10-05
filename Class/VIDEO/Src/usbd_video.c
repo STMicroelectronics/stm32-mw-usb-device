@@ -640,7 +640,8 @@ static uint8_t  USBD_VIDEO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
   static uint16_t PcktSze = UVC_PACKET_SIZE;
   static uint8_t  payload_header[2] = {0x02U, 0x00U};
   uint8_t i = 0U;
-  uint32_t RemainData, DataOffset = 0U;
+  uint32_t RemainData = 0U;
+  uint32_t DataOffset = 0U;
 
   /* Check if the Streaming has already been started */
   if (hVIDEO->uvc_state == UVC_PLAY_STATUS_STREAMING)

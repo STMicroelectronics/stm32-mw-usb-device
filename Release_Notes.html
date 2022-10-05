@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="generator" content="pandoc" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
-  <title>Release Notes for STM32GK Firmware Package</title>
+  <title>Release Notes for STM32Cube USB Device Library</title>
   <style>
     code{white-space: pre-wrap;}
     span.smallcaps{font-variant: small-caps;}
@@ -58,6 +58,53 @@ Page</a> : STM32Cube USB Wiki Page</li>
 </div>
 <section id="update-history" class="col-sm-12 col-lg-8">
 <h1>Update History</h1>
+<div class="collapse">
+<input type="checkbox" id="collapse-section23" checked aria-hidden="true">
+<label for="collapse-section23" aria-hidden="true">V2.11.1 /
+27-September-2022</label>
+<h2 id="main-changes">Main Changes</h2>
+<table>
+<thead>
+<tr class="header">
+<th style="text-align: left;">Headline</th>
+</tr>
+</thead>
+<tbody>
+<tr class="even">
+<td style="text-align: left;"> Improvement of the memory management
+</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>USB Core:</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Fix some compilation warnings related
+to unused parameters</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Improve some code parts style</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Add check on the USB Device status in
+USBD_LL_Suspend before suspending it</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>USB CDC-ACM Class:</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Remove redundant prototype declaration of
+USBD_CDC_GetOtherSpeedCfgDesc()</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;"><strong>USB CompositeBuilder, CCID, CDC_ECM, CDC_RNDIS,
+CustomHID, MSC & Video Classes:</strong></td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">  Improve some code parts style </td>
+</tr>
+</tbody>
+</table>
+</div>
 <div class="collapse">
 <input type="checkbox" id="collapse-section22" checked aria-hidden="true">
 <label for="collapse-section22" aria-hidden="true">V2.11.0 /
@@ -170,7 +217,7 @@ selected</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section20" aria-hidden="true">
+<input type="checkbox" id="collapse-section20" checked aria-hidden="true">
 <label for="collapse-section20" aria-hidden="true">V2.9.0 /
 06-July-2021</label>
 <h2 id="main-changes-2">Main Changes</h2>
@@ -216,7 +263,7 @@ missing casting during class handler allocation</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section19" aria-hidden="true">
+<input type="checkbox" id="collapse-section19" checked aria-hidden="true">
 <label for="collapse-section19" aria-hidden="true">V2.8.0 /
 10-Mars-2021</label>
 <h2 id="main-changes-3">Main Changes</h2>
@@ -266,7 +313,7 @@ format support</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section17" aria-hidden="true">
+<input type="checkbox" id="collapse-section17" checked aria-hidden="true">
 <label for="collapse-section17" aria-hidden="true">V2.7.1 /
 18-August-2020</label>
 <h2 id="main-changes-4">Main Changes</h2>
@@ -285,7 +332,7 @@ check to Class handler</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section16" aria-hidden="true">
+<input type="checkbox" id="collapse-section16" checked aria-hidden="true">
 <label for="collapse-section16" aria-hidden="true">V2.7.0 /
 12-August-2020</label>
 <h2 id="main-changes-5">Main Changes</h2>
@@ -370,7 +417,7 @@ user code</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section15" aria-hidden="true">
+<input type="checkbox" id="collapse-section15" checked aria-hidden="true">
 <label for="collapse-section15" aria-hidden="true">V2.6.1 /
 05-June-2020</label>
 <h2 id="main-changes-6">Main Changes</h2>
@@ -410,7 +457,7 @@ compatibility with device library version below v2.6.0</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section14" aria-hidden="true">
+<input type="checkbox" id="collapse-section14" checked aria-hidden="true">
 <label for="collapse-section14" aria-hidden="true">V2.6.0 /
 27-December-2019</label>
 <h2 id="main-changes-7">Main Changes</h2>
@@ -493,7 +540,7 @@ transfer: USBD_CUSTOM_HID_ReceivePacket()</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section13" aria-hidden="true">
+<input type="checkbox" id="collapse-section13" checked aria-hidden="true">
 <label for="collapse-section13" aria-hidden="true">V2.5.3 /
 30-April-2019</label>
 <h2 id="main-changes-8">Main Changes</h2>
@@ -532,7 +579,7 @@ device state only if the current state is USBD_STATE_SUSPENDED</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section12" aria-hidden="true">
+<input type="checkbox" id="collapse-section12" checked aria-hidden="true">
 <label for="collapse-section12" aria-hidden="true">V2.5.2 /
 27-Mars-2019</label>
 <h2 id="main-changes-9">Main Changes</h2>
@@ -552,7 +599,7 @@ NVIC_SystemReset() prototype change</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section11" aria-hidden="true">
+<input type="checkbox" id="collapse-section11" checked aria-hidden="true">
 <label for="collapse-section11" aria-hidden="true">V2.5.1 /
 03-August-2018</label>
 <h2 id="main-changes-10">Main Changes</h2>
@@ -587,7 +634,7 @@ Break on USBD_Template_Setup API</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section10" aria-hidden="true">
+<input type="checkbox" id="collapse-section10" checked aria-hidden="true">
 <label for="collapse-section10" aria-hidden="true">V2.5.0 /
 15-December-2017</label>
 <h2 id="main-changes-11">Main Changes</h2>
@@ -637,7 +684,7 @@ machine</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section9" aria-hidden="true">
+<input type="checkbox" id="collapse-section9" checked aria-hidden="true">
 <label for="collapse-section9" aria-hidden="true">V2.4.2 /
 11-December-2015</label>
 <h2 id="main-changes-12">Main Changes</h2>
@@ -659,7 +706,7 @@ by #include “usbd_cdc.h”</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section8" aria-hidden="true">
+<input type="checkbox" id="collapse-section8" checked aria-hidden="true">
 <label for="collapse-section8" aria-hidden="true">V2.4.1 /
 19-June-2015</label>
 <h2 id="main-changes-13">Main Changes</h2>
@@ -698,7 +745,7 @@ DMA half transfer</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section7" aria-hidden="true">
+<input type="checkbox" id="collapse-section7" checked aria-hidden="true">
 <label for="collapse-section7" aria-hidden="true">V2.4.0 /
 28-February-2015</label>
 <h2 id="main-changes-14">Main Changes</h2>
@@ -756,7 +803,7 @@ CDC_SET_CONTROL_LINE_STATE and similar no-data setup requests.</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section6" aria-hidden="true">
+<input type="checkbox" id="collapse-section6" checked aria-hidden="true">
 <label for="collapse-section6" aria-hidden="true">V2.3.0 /
 04-November-2014</label>
 <h2 id="main-changes-15">Main Changes</h2>
@@ -790,7 +837,7 @@ update</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section5" aria-hidden="true">
+<input type="checkbox" id="collapse-section5" checked aria-hidden="true">
 <label for="collapse-section5" aria-hidden="true">V2.2.0 /
 13-June-2014</label>
 <h2 id="main-changes-16">Main Changes</h2>
@@ -845,7 +892,7 @@ USBD_HID_CLASS)</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section4" aria-hidden="true">
+<input type="checkbox" id="collapse-section4" checked aria-hidden="true">
 <label for="collapse-section4" aria-hidden="true">V2.1.0 /
 22-April-2014</label>
 <h2 id="main-changes-17">Main Changes</h2>
@@ -892,7 +939,7 @@ usbd_customhid_if_template.c/h</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section3" aria-hidden="true">
+<input type="checkbox" id="collapse-section3" checked aria-hidden="true">
 <label for="collapse-section3" aria-hidden="true">V2.0.0 /
 18-February-2014</label>
 <h2 id="main-changes-18">Main Changes</h2>
@@ -915,7 +962,7 @@ compatible.</td>
 development</strong></p>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section2" aria-hidden="true">
+<input type="checkbox" id="collapse-section2" checked aria-hidden="true">
 <label for="collapse-section2" aria-hidden="true">V1.1.0 /
 19-March-2012</label>
 <h2 id="main-changes-19">Main Changes</h2>
@@ -952,7 +999,7 @@ to take into account error during Control OUT stage</td>
 </table>
 </div>
 <div class="collapse">
-<input type="checkbox" id="collapse-section1" aria-hidden="true">
+<input type="checkbox" id="collapse-section1" checked aria-hidden="true">
 <label for="collapse-section1" aria-hidden="true">V1.0.0 /
 22-July-2011</label>
 <h2 id="main-changes-20">Main Changes</h2>

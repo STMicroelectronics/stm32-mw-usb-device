@@ -1,5 +1,5 @@
 ---
-pagetitle: Release Notes for STM32GK Firmware Package
+pagetitle: Release Notes for STM32Cube USB Device Library
 lang: en
 header-includes: <link rel="icon" type="image/x-icon" href="_htmresc/favicon.png" />
 ---
@@ -33,6 +33,30 @@ Here is the list of references to user documents:
 -   [UM1734](https://www.st.com/resource/en/user_manual/DM00108129.pdf) : STM32Cube USB device library User Manual
 -   [Wiki Page](https://wiki.st.com/stm32mcu/wiki/USB_overview) : STM32Cube USB Wiki Page
 
+:::
+
+::: {.col-sm-12 .col-lg-8}
+# Update History
+::: {.collapse}
+<input type="checkbox" id="collapse-section23" checked aria-hidden="true">
+<label for="collapse-section23" aria-hidden="true">V2.11.1 / 27-September-2022</label>
+<div>
+
+## Main Changes
+
+ Headline
+ ---------
+ Improvement of the memory management
+ **USB Core:**
+ Fix some compilation warnings related to unused parameters
+ Improve some code parts style
+ Add check on the USB Device status in USBD_LL_Suspend before suspending it
+ **USB CDC-ACM Class:**
+ Remove redundant prototype declaration of USBD_CDC_GetOtherSpeedCfgDesc()
+ **USB CompositeBuilder, CCID, CDC_ECM, CDC_RNDIS, CustomHID, MSC & Video Classes:**
+ Improve some code parts style
+
+</div>
 :::
 
 ::: {.col-sm-12 .col-lg-8}
@@ -88,7 +112,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section20" aria-hidden="true">
+<input type="checkbox" id="collapse-section20" checked aria-hidden="true">
 <label for="collapse-section20" aria-hidden="true">V2.9.0 / 06-July-2021</label>
 <div>
 
@@ -110,7 +134,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section19" aria-hidden="true">
+<input type="checkbox" id="collapse-section19" checked aria-hidden="true">
 <label for="collapse-section19" aria-hidden="true">V2.8.0 / 10-Mars-2021</label>
 <div>
 
@@ -134,7 +158,7 @@ Here is the list of references to user documents:
 
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section17" aria-hidden="true">
+<input type="checkbox" id="collapse-section17" checked aria-hidden="true">
 <label for="collapse-section17" aria-hidden="true">V2.7.1 / 18-August-2020</label>
 <div>
 
@@ -149,7 +173,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section16" aria-hidden="true">
+<input type="checkbox" id="collapse-section16" checked aria-hidden="true">
 <label for="collapse-section16" aria-hidden="true">V2.7.0 / 12-August-2020</label>
 <div>
 
@@ -181,7 +205,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section15" aria-hidden="true">
+<input type="checkbox" id="collapse-section15" checked aria-hidden="true">
 <label for="collapse-section15" aria-hidden="true">V2.6.1 / 05-June-2020</label>
 <div>
 
@@ -201,7 +225,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section14" aria-hidden="true">
+<input type="checkbox" id="collapse-section14" checked aria-hidden="true">
 <label for="collapse-section14" aria-hidden="true">V2.6.0 / 27-December-2019</label>
 <div>
 
@@ -234,7 +258,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section13" aria-hidden="true">
+<input type="checkbox" id="collapse-section13" checked aria-hidden="true">
 <label for="collapse-section13" aria-hidden="true">V2.5.3 / 30-April-2019</label>
 <div>
 
@@ -255,7 +279,7 @@ Here is the list of references to user documents:
 
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section12" aria-hidden="true">
+<input type="checkbox" id="collapse-section12" checked aria-hidden="true">
 <label for="collapse-section12" aria-hidden="true">V2.5.2 / 27-Mars-2019</label>
 <div>
 
@@ -270,7 +294,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section11" aria-hidden="true">
+<input type="checkbox" id="collapse-section11" checked aria-hidden="true">
 <label for="collapse-section11" aria-hidden="true">V2.5.1 / 03-August-2018</label>
 <div>
 
@@ -288,7 +312,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section10" aria-hidden="true">
+<input type="checkbox" id="collapse-section10" checked aria-hidden="true">
 <label for="collapse-section10" aria-hidden="true">V2.5.0 / 15-December-2017</label>
 <div>
 
@@ -311,7 +335,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section9" aria-hidden="true">
+<input type="checkbox" id="collapse-section9" checked aria-hidden="true">
 <label for="collapse-section9" aria-hidden="true">V2.4.2 / 11-December-2015</label>
 <div>
 
@@ -327,7 +351,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section8" aria-hidden="true">
+<input type="checkbox" id="collapse-section8" checked aria-hidden="true">
 <label for="collapse-section8" aria-hidden="true">V2.4.1 / 19-June-2015</label>
 <div>
 
@@ -348,7 +372,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section7" aria-hidden="true">
+<input type="checkbox" id="collapse-section7" checked aria-hidden="true">
 <label for="collapse-section7" aria-hidden="true">V2.4.0 / 28-February-2015</label>
 <div>
 
@@ -371,7 +395,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section6" aria-hidden="true">
+<input type="checkbox" id="collapse-section6" checked aria-hidden="true">
 <label for="collapse-section6" aria-hidden="true">V2.3.0 / 04-November-2014</label>
 <div>
 
@@ -389,7 +413,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section5" aria-hidden="true">
+<input type="checkbox" id="collapse-section5" checked aria-hidden="true">
 <label for="collapse-section5" aria-hidden="true">V2.2.0 / 13-June-2014</label>
 <div>
 
@@ -412,7 +436,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section4" aria-hidden="true">
+<input type="checkbox" id="collapse-section4" checked aria-hidden="true">
 <label for="collapse-section4" aria-hidden="true">V2.1.0 / 22-April-2014</label>
 <div>
 
@@ -433,7 +457,7 @@ Here is the list of references to user documents:
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section3" aria-hidden="true">
+<input type="checkbox" id="collapse-section3" checked aria-hidden="true">
 <label for="collapse-section3" aria-hidden="true">V2.0.0 / 18-February-2014</label>
 <div>
 
@@ -452,7 +476,7 @@ Major update based on STM32Cube specification.
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section2" aria-hidden="true">
+<input type="checkbox" id="collapse-section2" checked aria-hidden="true">
 <label for="collapse-section2" aria-hidden="true">V1.1.0 / 19-March-2012</label>
 <div>
 
@@ -471,7 +495,7 @@ Major update based on STM32Cube specification.
 :::
 
 ::: {.collapse}
-<input type="checkbox" id="collapse-section1" aria-hidden="true">
+<input type="checkbox" id="collapse-section1" checked aria-hidden="true">
 <label for="collapse-section1" aria-hidden="true">V1.0.0 / 22-July-2011</label>
 <div>
 
