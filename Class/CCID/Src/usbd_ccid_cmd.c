@@ -792,7 +792,7 @@ void RDR_to_PC_SlotStatus(uint8_t  errorCode, USBD_HandleTypeDef *pdev)
 
   hccid->UsbBlkInData.bMessageType = RDR_TO_PC_SLOTSTATUS;
   hccid->UsbBlkInData.dwLength = 0U;
-  hccid->UsbBlkInData.bError = 0U;
+  hccid->UsbBlkInData.bError = errorCode;
   hccid->UsbBlkInData.bSpecific = 0U;    /* bClockStatus = 00h Clock running
   01h Clock stopped in state L
   02h Clock stopped in state H
