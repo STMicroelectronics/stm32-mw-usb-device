@@ -45,7 +45,7 @@ extern "C" {
 
 #define USBD_MAX_NUM_INTERFACES                     1U
 #define USBD_MAX_NUM_CONFIGURATION                  1U
-#define USBD_MAX_STR_DESC_SIZ                       0x100U
+#define USBD_MAX_STR_DESC_SIZ                       0xFFU /* Descriptor 'bLength' max value */
 #define USBD_SELF_POWERED                           1U
 #define USBD_DEBUG_LEVEL                            2U
 /* #define USBD_USER_REGISTER_CALLBACK                 1U */
