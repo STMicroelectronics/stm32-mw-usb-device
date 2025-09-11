@@ -372,10 +372,8 @@ typedef struct _USBD_HandleTypeDef
   __IO uint8_t            dev_state;
   __IO uint8_t            dev_old_state;
   uint8_t                 dev_address;
-  uint8_t                 dev_connection_status;
   uint8_t                 dev_test_mode;
   uint32_t                dev_remote_wakeup;
-  uint8_t                 ConfIdx;
 
   USBD_SetupReqTypedef    request;
   USBD_DescriptorsTypeDef *pDesc;
@@ -384,7 +382,6 @@ typedef struct _USBD_HandleTypeDef
   void                    *pClassDataCmsit[USBD_MAX_SUPPORTED_CLASS];
   void                    *pUserData[USBD_MAX_SUPPORTED_CLASS];
   void                    *pData;
-  void                    *pBosDesc;
   void                    *pConfDesc;
   uint32_t                classId;
   uint32_t                NumClasses;
