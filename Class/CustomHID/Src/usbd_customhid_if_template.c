@@ -37,7 +37,9 @@ static int8_t TEMPLATE_CUSTOM_HID_OutEvent(uint8_t *report_buffer);
 #else
 static int8_t TEMPLATE_CUSTOM_HID_OutEvent(uint8_t event_idx, uint8_t state);
 #endif /* USBD_CUSTOMHID_REPORT_BUFFER_EVENT_ENABLED */
-
+#ifdef USBD_CUSTOMHID_INPUT_EVENT_ENABLED
+static void TEMPLATE_CUSTOM_HID_InEvent(void);
+#endif /* USBD_CUSTOMHID_INPUT_EVENT_ENABLED */
 #ifdef USBD_CUSTOMHID_CTRL_REQ_COMPLETE_CALLBACK_ENABLED
 static int8_t TEMPLATE_CUSTOM_HID_CtrlReqComplete(uint8_t request, uint16_t wLength);
 #endif /* USBD_CUSTOMHID_CTRL_REQ_COMPLETE_CALLBACK_ENABLED */
@@ -59,6 +61,9 @@ USBD_CUSTOM_HID_ItfTypeDef USBD_CustomHID_template_fops =
   TEMPLATE_CUSTOM_HID_Init,
   TEMPLATE_CUSTOM_HID_DeInit,
   TEMPLATE_CUSTOM_HID_OutEvent,
+#ifdef USBD_CUSTOMHID_INPUT_EVENT_ENABLED
+  TEMPLATE_CUSTOM_HID_InEvent,
+#endif
 #ifdef USBD_CUSTOMHID_CTRL_REQ_COMPLETE_CALLBACK_ENABLED
   TEMPLATE_CUSTOM_HID_CtrlReqComplete,
 #endif /* USBD_CUSTOMHID_CTRL_REQ_COMPLETE_CALLBACK_ENABLED */
@@ -122,6 +127,12 @@ static int8_t TEMPLATE_CUSTOM_HID_OutEvent(uint8_t event_idx, uint8_t state)
 
   return (0);
 }
+
+#ifdef USBD_CUSTOMHID_INPUT_EVENT_ENABLED
+static void TEMPLATE_CUSTOM_HID_InEvent(void)
+{
+}
+#endif
 
 #ifdef USBD_CUSTOMHID_CTRL_REQ_COMPLETE_CALLBACK_ENABLED
 /**

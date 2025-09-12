@@ -690,6 +690,10 @@ static uint8_t USBD_CUSTOM_HID_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
   be caused by  a new transfer before the end of the previous transfer */
   ((USBD_CUSTOM_HID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId])->state = CUSTOM_HID_IDLE;
 
+#ifdef USBD_CUSTOMHID_INPUT_EVENT_ENABLED
+  ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData[pdev->classId])->InEvent();
+#endif
+
   return (uint8_t)USBD_OK;
 }
 
