@@ -1175,12 +1175,12 @@ static int8_t SCSI_CheckAddressRange(USBD_HandleTypeDef *pdev, uint8_t lun,
 }
 
 /**
-  * @brief  SCSI_ProcessRead
+  * @brief  SCSI_ProcessReadNow
   *         Handle Read Process
   * @param  lun: Logical unit number
   * @retval status
   */
-static int8_t SCSI_ProcessRead(USBD_HandleTypeDef *pdev, uint8_t lun)
+int8_t SCSI_ProcessReadNow(USBD_HandleTypeDef *pdev, uint8_t lun)
 {
   USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk = &hmsc->scsi_blk[lun];
@@ -1220,6 +1220,36 @@ static int8_t SCSI_ProcessRead(USBD_HandleTypeDef *pdev, uint8_t lun)
   {
     hmsc->bot_state = USBD_BOT_LAST_DATA_IN;
   }
+
+  return 0;
+}
+
+__weak void SCSI_ProcessReadReady(void)
+{
+  /* signalize to OS -> reading from MSC is ready */
+}
+
+/**
+  * @brief  SCSI_ProcessRead
+  *         Handle Read Process
+  * @param  lun: Logical unit number
+  * @retval status
+  */
+static int8_t SCSI_ProcessRead(USBD_HandleTypeDef *pdev, uint8_t lun)
+{
+  USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+
+  if (hmsc == NULL)
+  {
+    return -1;
+  }
+
+#if MSC_READ_IN_THREAD
+  UNUSED(lun);
+  SCSI_ProcessReadReady();
+#else
+  SCSI_ProcessReadNow(pdev, lun);
+#endif
 
   return 0;
 }

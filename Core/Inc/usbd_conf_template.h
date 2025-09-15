@@ -60,6 +60,7 @@ extern "C" {
 
 /* MSC Class Config */
 #define MSC_MEDIA_PACKET                            8192U
+#define MSC_READ_IN_THREAD                          0U
 
 /* CDC Class Config */
 #define USBD_CDC_INTERVAL                           2000U
