@@ -56,7 +56,7 @@ int8_t STORAGE_Write(uint8_t lun, uint8_t *buf, uint32_t blk_addr,
 int8_t STORAGE_GetMaxLun(void);
 
 /* USB Mass storage Standard Inquiry Data */
-int8_t  STORAGE_Inquirydata[] =  /* 36 */
+uint8_t  STORAGE_Inquirydata[] =  /* 36 */
 {
 
   /* LUN 0 */
