@@ -507,15 +507,18 @@ uint8_t  USBD_CMPSIT_AddToConfDesc(USBD_HandleTypeDef *pdev)
       pdev->tclasslist[pdev->classId].Ifs[0] = idxIf;
 
       /* Assign endpoint numbers */
-      pdev->tclasslist[pdev->classId].NumEps = 2U; /* EP1_IN, EP1_OUT */
+      pdev->tclasslist[pdev->classId].NumEps = 1U; /* EP1_IN */
 
       /* Set IN endpoint slot */
       iEp = pdev->tclasslist[pdev->classId].EpAdd[0];
       USBD_CMPSIT_AssignEp(pdev, iEp, USBD_EP_TYPE_INTR,CUSTOM_HID_EPIN_SIZE);
 
+#ifndef USBD_CUSTOMHID_OUT_VIA_CONTROL_EP0
+      pdev->tclasslist[pdev->classId].NumEps += 1U; /* EP1_OUT */
       /* Set OUT endpoint slot */
       iEp = pdev->tclasslist[pdev->classId].EpAdd[1];
       USBD_CMPSIT_AssignEp(pdev, iEp, USBD_EP_TYPE_INTR, CUSTOM_HID_EPOUT_SIZE);
+#endif
 
       /* Configure and Append the Descriptor */
       USBD_CMPSIT_CUSTOMHIDDesc(pdev, (uint32_t)pCmpstFSConfDesc, &CurrFSConfDescSz, (uint8_t)USBD_SPEED_FULL);
@@ -1406,9 +1409,11 @@ static void  USBD_CMPSIT_CUSTOMHIDDesc(USBD_HandleTypeDef *pdev, uint32_t pConf,
   __USBD_CMPSIT_SET_EP(pdev->tclasslist[pdev->classId].Eps[0].add, \
                        USBD_EP_TYPE_INTR, CUSTOM_HID_EPIN_SIZE, CUSTOM_HID_HS_BINTERVAL, CUSTOM_HID_FS_BINTERVAL);
 
+#ifndef USBD_CUSTOMHID_OUT_VIA_CONTROL_EP0
   /* Append Endpoint descriptor to Configuration descriptor */
   __USBD_CMPSIT_SET_EP(pdev->tclasslist[pdev->classId].Eps[1].add, \
                        USBD_EP_TYPE_INTR, CUSTOM_HID_EPOUT_SIZE, CUSTOM_HID_HS_BINTERVAL, CUSTOM_HID_FS_BINTERVAL);
+#endif
 
   /* Update Config Descriptor and IAD descriptor */
   ((USBD_ConfigDescTypeDef *)pConf)->bNumInterfaces += 1U;
