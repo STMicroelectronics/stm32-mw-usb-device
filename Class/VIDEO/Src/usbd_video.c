@@ -318,7 +318,7 @@ __ALIGN_BEGIN static uint8_t USBD_VIDEO_CfgDesc[] __ALIGN_END =
   UVC_IN_EP,                                     /* bEndpointAddress */
   0x05,                                          /* bmAttributes: ISO transfer */
   LOBYTE(UVC_ISO_FS_MPS),                        /* wMaxPacketSize */
-  LOBYTE(UVC_ISO_FS_MPS),
+  HIBYTE(UVC_ISO_FS_MPS),
   0x01,                                          /* bInterval: 1 frame interval */
 };
 
