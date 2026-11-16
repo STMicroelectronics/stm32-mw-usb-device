@@ -122,7 +122,13 @@ static void DFU_ClearStatus(USBD_HandleTypeDef *pdev);
 static void DFU_GetState(USBD_HandleTypeDef *pdev);
 static void DFU_Abort(USBD_HandleTypeDef *pdev);
 static void DFU_Leave(USBD_HandleTypeDef *pdev);
-static void *USBD_DFU_GetDfuFuncDesc(uint8_t *pConfDesc);
+static void *DFU_GetDfuFuncDesc(uint8_t *pConfDesc);
+static uint8_t DFU_IsAppRangeValid(uint32_t address, uint32_t length);
+static uint8_t DFU_GetBlockAddress(uint32_t data_ptr, uint32_t block_num,
+                                   uint32_t length, uint32_t *address);
+static uint8_t DFU_GetUploadAddress(uint32_t data_ptr, uint32_t block_num,
+                                    uint32_t length, uint32_t *address);
+static uint8_t DFU_SetAddressError(USBD_DFU_HandleTypeDef *hdfu);
 
 /**
   * @}
@@ -357,6 +363,7 @@ static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
 
   if (hdfu == NULL)
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -418,7 +425,7 @@ static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
         case USB_REQ_GET_DESCRIPTOR:
           if ((req->wValue >> 8) == DFU_DESCRIPTOR_TYPE)
           {
-            pbuf = (uint8_t *)USBD_DFU_GetDfuFuncDesc(pdev->pConfDesc);
+            pbuf = (uint8_t *)DFU_GetDfuFuncDesc(pdev->pConfDesc);
 
             if (pbuf != NULL)
             {
@@ -511,6 +518,117 @@ static uint8_t USBD_DFU_EP0_RxReady(USBD_HandleTypeDef *pdev)
   UNUSED(pdev);
 
   return (uint8_t)USBD_OK;
+}
+
+/**
+  * @brief  DFU_IsAppRangeValid
+  *         check address range
+  * @param  address: memory address
+  * @param  length: length of data block
+  * @retval status
+  */
+static uint8_t DFU_IsAppRangeValid(uint32_t address, uint32_t length)
+{
+#if (USBD_DFU_RANGE_CHECK_ACTIVE == 1U)
+  return (uint8_t)((address >= USBD_DFU_APP_DEFAULT_ADD) &&
+                   (address < USBD_DFU_APP_END_ADDRESS) &&
+                   (length <= (USBD_DFU_APP_END_ADDRESS - address)));
+#else
+  /* Address check disabled or delegated to the application: historical behavior. */
+  UNUSED(address);
+  UNUSED(length);
+
+  return 1U;
+#endif /* USBD_DFU_RANGE_CHECK_ACTIVE */
+}
+
+/**
+  * @brief  DFU_GetBlockAddress
+  *         Decode block address
+  * @param  data_ptr: data pointer
+  * @param  block_num: block number
+  * @param  length: block length
+  * @param  address: memory address
+  * @retval status
+  */
+static uint8_t DFU_GetBlockAddress(uint32_t data_ptr, uint32_t block_num,
+                                   uint32_t length, uint32_t *address)
+{
+#if (USBD_DFU_RANGE_CHECK_ACTIVE == 1U)
+  uint32_t offset;
+
+  /* Reject a block offset or an address that wraps around the 32-bit address space */
+  if ((block_num - 2U) > (0xFFFFFFFFU / USBD_DFU_XFER_SIZE))
+  {
+    return 0U;
+  }
+
+  offset = (block_num - 2U) * USBD_DFU_XFER_SIZE;
+
+  if (offset > (0xFFFFFFFFU - data_ptr))
+  {
+    return 0U;
+  }
+#endif /* USBD_DFU_RANGE_CHECK_ACTIVE */
+
+  *address = ((block_num - 2U) * USBD_DFU_XFER_SIZE) + data_ptr;
+
+  return DFU_IsAppRangeValid(*address, length);
+}
+
+/**
+  * @brief  DFU_GetUploadAddress
+  *         Decode the address of an upload block. A block that wraps around the 32-bit address space is always
+  *         rejected; the application range applies only when USBD_DFU_UPLOAD_RANGE_CHECK_ACTIVE is set.
+  * @param  data_ptr: data pointer
+  * @param  block_num: block number, at least 2
+  * @param  length: block length, not zero
+  * @param  address: memory address
+  * @retval 1 if the block can be read, 0 otherwise
+  */
+static uint8_t DFU_GetUploadAddress(uint32_t data_ptr, uint32_t block_num,
+                                    uint32_t length, uint32_t *address)
+{
+  uint32_t offset;
+
+  if ((block_num - 2U) > (0xFFFFFFFFU / USBD_DFU_XFER_SIZE))
+  {
+    return 0U;
+  }
+
+  offset = (block_num - 2U) * USBD_DFU_XFER_SIZE;
+
+  /* The first and the last byte of the block must both lie in the 32-bit address space */
+  if ((offset > (0xFFFFFFFFU - data_ptr)) || ((length - 1U) > (0xFFFFFFFFU - data_ptr - offset)))
+  {
+    return 0U;
+  }
+
+  *address = data_ptr + offset;
+
+#if (USBD_DFU_UPLOAD_RANGE_CHECK_ACTIVE == 1U)
+  return DFU_IsAppRangeValid(*address, length);
+#else
+  return 1U;
+#endif /* USBD_DFU_UPLOAD_RANGE_CHECK_ACTIVE */
+}
+
+/**
+  * @brief  DFU_SetAddressError
+  *         Decode block address
+  * @param  hdfu: dfu handler
+  * @retval status
+  */
+static uint8_t DFU_SetAddressError(USBD_DFU_HandleTypeDef *hdfu)
+{
+  hdfu->dev_state = DFU_STATE_ERROR;
+  hdfu->dev_status[0] = DFU_ERROR_ADDRESS;
+  hdfu->dev_status[1] = 0U;
+  hdfu->dev_status[2] = 0U;
+  hdfu->dev_status[3] = 0U;
+  hdfu->dev_status[4] = hdfu->dev_state;
+
+  return (uint8_t)USBD_FAIL;
 }
 
 /**
@@ -608,6 +726,11 @@ static uint8_t  USBD_DFU_EP0_TxReady(USBD_HandleTypeDef *pdev)
           app_addr_ptr += (uint32_t)hdfu->buffer.d8[2] << 8;
           app_addr_ptr += (uint32_t)hdfu->buffer.d8[3] << 16;
           app_addr_ptr += (uint32_t)hdfu->buffer.d8[4] << 24;
+
+          if (DFU_IsAppRangeValid(app_addr_ptr, 0U) == 0U)
+          {
+            return DFU_SetAddressError(hdfu);
+          }
 
           if (DfuInterface->Erase(app_addr_ptr) != USBD_OK)
           {
@@ -720,7 +843,10 @@ static uint8_t  USBD_DFU_EP0_TxReady(USBD_HandleTypeDef *pdev)
 #endif /* USBD_DFU_VENDOR_CHECK_ENABLED */
 
         /* Decode the required address */
-        addr = ((hdfu->wblock_num - 2U) * USBD_DFU_XFER_SIZE) + hdfu->data_ptr;
+        if (DFU_GetBlockAddress(hdfu->data_ptr, hdfu->wblock_num, hdfu->wlength, &addr) == 0U)
+        {
+          return DFU_SetAddressError(hdfu);
+        }
 
         /* Perform the write operation */
         if (DfuInterface->Write(hdfu->buffer.d8, (uint8_t *)addr, hdfu->wlength) != USBD_OK)
@@ -850,7 +976,7 @@ uint8_t USBD_DFU_RegisterMedia(USBD_HandleTypeDef *pdev,
 static void DFU_Detach(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
   USBD_DFU_HandleTypeDef *hdfu = (USBD_DFU_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
-  USBD_DFUFuncDescTypeDef *pDfuFunc = (USBD_DFUFuncDescTypeDef *)USBD_DFU_GetDfuFuncDesc(pdev->pConfDesc);
+  USBD_DFUFuncDescTypeDef *pDfuFunc = (USBD_DFUFuncDescTypeDef *)DFU_GetDfuFuncDesc(pdev->pConfDesc);
 
   if ((hdfu == NULL) || (pDfuFunc == NULL))
   {
@@ -884,8 +1010,15 @@ static void DFU_Detach(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
   }
   else
   {
-    /* Wait for the period of time specified in Detach request */
-    USBD_Delay((uint32_t)req->wValue);
+    uint32_t wait_ms = req->wValue;
+
+    if (wait_ms > pDfuFunc->wDetachTimeout)
+    {
+      wait_ms = pDfuFunc->wDetachTimeout;
+    }
+
+    /* Respect the maximum detach time advertised by the DFU functional descriptor */
+    USBD_Delay(wait_ms);
   }
 }
 
@@ -1073,7 +1206,14 @@ static void DFU_Upload(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
         if (VendorStatus == IS_DFU_PHY_ADDRESS)
 #endif /* USBD_DFU_VENDOR_CMD_ENABLED */
         {
-          addr = ((hdfu->wblock_num - 2U) * USBD_DFU_XFER_SIZE) + hdfu->data_ptr;
+          if (DFU_GetUploadAddress(hdfu->data_ptr, hdfu->wblock_num, hdfu->wlength, &addr) == 0U)
+          {
+            (void)DFU_SetAddressError(hdfu);
+
+            /* Call the error management function (command will be NAKed) */
+            USBD_CtlError(pdev, req);
+            return;
+          }
 
           /* Return the physical address where data are stored */
           phaddr = DfuInterface->Read((uint8_t *)addr, hdfu->buffer.d8, hdfu->wlength);
@@ -1142,7 +1282,7 @@ static void DFU_GetStatus(USBD_HandleTypeDef *pdev)
 {
   USBD_DFU_HandleTypeDef *hdfu = (USBD_DFU_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_DFU_MediaTypeDef *DfuInterface = (USBD_DFU_MediaTypeDef *)pdev->pUserData[pdev->classId];
-  USBD_DFUFuncDescTypeDef *pDfuFunc = (USBD_DFUFuncDescTypeDef *)USBD_DFU_GetDfuFuncDesc(pdev->pConfDesc);
+  USBD_DFUFuncDescTypeDef *pDfuFunc = (USBD_DFUFuncDescTypeDef *)DFU_GetDfuFuncDesc(pdev->pConfDesc);
 
   if ((hdfu == NULL) || (DfuInterface == NULL) || (pDfuFunc == NULL))
   {
@@ -1315,7 +1455,7 @@ static void DFU_Leave(USBD_HandleTypeDef *pdev)
 {
   USBD_DFU_HandleTypeDef *hdfu = (USBD_DFU_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_DFU_MediaTypeDef *DfuInterface = (USBD_DFU_MediaTypeDef *)pdev->pUserData[pdev->classId];
-  USBD_DFUFuncDescTypeDef *pDfuFunc = (USBD_DFUFuncDescTypeDef *)USBD_DFU_GetDfuFuncDesc(pdev->pConfDesc);
+  USBD_DFUFuncDescTypeDef *pDfuFunc = (USBD_DFUFuncDescTypeDef *)DFU_GetDfuFuncDesc(pdev->pConfDesc);
 
   if ((hdfu == NULL) || (DfuInterface == NULL) || (pDfuFunc == NULL))
   {
@@ -1359,13 +1499,13 @@ static void DFU_Leave(USBD_HandleTypeDef *pdev)
 }
 
 /**
-  * @brief  USBD_DFU_GetDfuFuncDesc
+  * @brief  DFU_GetDfuFuncDesc
   *         This function return the DFU descriptor
   * @param  pdev: device instance
   * @param  pConfDesc:  pointer to Bos descriptor
   * @retval pointer to the DFU descriptor
   */
-static void *USBD_DFU_GetDfuFuncDesc(uint8_t *pConfDesc)
+static void *DFU_GetDfuFuncDesc(uint8_t *pConfDesc)
 {
   USBD_ConfigDescTypeDef *desc = (USBD_ConfigDescTypeDef *)(void *)pConfDesc;
   USBD_DescHeaderTypeDef *pdesc = (USBD_DescHeaderTypeDef *)(void *)pConfDesc;
@@ -1403,4 +1543,3 @@ static void *USBD_DFU_GetDfuFuncDesc(uint8_t *pConfDesc)
 /**
   * @}
   */
-

@@ -211,9 +211,6 @@ __ALIGN_BEGIN static uint8_t USBD_PRNT_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER
 };
 #endif /* USE_USBD_COMPOSITE */
 
-static uint8_t PRNTInEpAdd  = PRNT_IN_EP;
-static uint8_t PRNTOutEpAdd = PRNT_OUT_EP;
-
 /**
   * @}
   */
@@ -250,10 +247,13 @@ static uint8_t USBD_PRNT_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hPRNT;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hPRNT->in_ep = PRNT_IN_EP;
+  hPRNT->out_ep = PRNT_OUT_EP;
+
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
-  PRNTInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  PRNTOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hPRNT->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hPRNT->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   /* Setup the max packet size according to selected speed */
@@ -267,16 +267,16 @@ static uint8_t USBD_PRNT_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   }
 
   /* Open EP IN */
-  (void)USBD_LL_OpenEP(pdev, PRNTInEpAdd, USBD_EP_TYPE_BULK, mps);
+  (void)USBD_LL_OpenEP(pdev, hPRNT->in_ep, USBD_EP_TYPE_BULK, mps);
 
   /* Set endpoint as used */
-  pdev->ep_in[PRNTInEpAdd & 0xFU].is_used = 1U;
+  pdev->ep_in[hPRNT->in_ep & 0xFU].is_used = 1U;
 
   /* Open EP OUT */
-  (void)USBD_LL_OpenEP(pdev, PRNTOutEpAdd, USBD_EP_TYPE_BULK, mps);
+  (void)USBD_LL_OpenEP(pdev, hPRNT->out_ep, USBD_EP_TYPE_BULK, mps);
 
   /* Set endpoint as used */
-  pdev->ep_out[PRNTOutEpAdd & 0xFU].is_used = 1U;
+  pdev->ep_out[hPRNT->out_ep & 0xFU].is_used = 1U;
 
   hPRNT->RxBuffer = NULL;
 
@@ -289,7 +289,7 @@ static uint8_t USBD_PRNT_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   }
 
   /* Prepare Out endpoint to receive next packet */
-  (void)USBD_LL_PrepareReceive(pdev, PRNTOutEpAdd, hPRNT->RxBuffer, mps);
+  (void)USBD_LL_PrepareReceive(pdev, hPRNT->out_ep, hPRNT->RxBuffer, mps);
 
   /* End of initialization phase */
   return (uint8_t)USBD_OK;
@@ -306,23 +306,19 @@ static uint8_t USBD_PRNT_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  PRNTInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  PRNTOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, PRNTInEpAdd);
-  pdev->ep_in[PRNTInEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP OUT */
-  (void)USBD_LL_CloseEP(pdev, PRNTOutEpAdd);
-  pdev->ep_out[PRNTOutEpAdd & 0xFU].is_used = 0U;
+  USBD_PRNT_HandleTypeDef *hPRNT = (USBD_PRNT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* DeInit physical Interface components */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hPRNT != NULL)
   {
+    /* Close EP IN */
+    (void)USBD_LL_CloseEP(pdev, hPRNT->in_ep);
+    pdev->ep_in[hPRNT->in_ep & 0xFU].is_used = 0U;
+
+    /* Close EP OUT */
+    (void)USBD_LL_CloseEP(pdev, hPRNT->out_ep);
+    pdev->ep_out[hPRNT->out_ep & 0xFU].is_used = 0U;
+
     ((USBD_PRNT_ItfTypeDef *)pdev->pUserData[pdev->classId])->DeInit();
     (void)USBD_free(pdev->pClassDataCmsit[pdev->classId]);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
@@ -351,14 +347,27 @@ static uint8_t USBD_PRNT_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
     case USB_REQ_TYPE_CLASS :
+      if ((hPRNT == NULL) || (hPRNTitf == NULL))
+      {
+        /* Class not configured: there is no response buffer to hand to the callback */
+        USBD_CtlError(pdev, req);
+        ret = USBD_FAIL;
+        break;
+      }
+
       if (req->wLength != 0U)
       {
         data_length = MIN(req->wLength, PRNT_DATA_HS_MAX_PACKET_SIZE);
 
         if ((req->bmRequest & 0x80U) != 0U)
         {
+          uint16_t requested_length = data_length;
+
           /* Call the User class interface function to process the command */
           hPRNTitf->Control_req(req->bRequest, (uint8_t *)hPRNT->data, &data_length);
+
+          /* Never answer with more than the host asked for or the class buffer holds */
+          data_length = MIN(data_length, requested_length);
 
           /* Return the answer to host */
           (void) USBD_CtlSendData(pdev, (uint8_t *)hPRNT->data, data_length);
@@ -372,7 +381,7 @@ static uint8_t USBD_PRNT_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
       else
       {
         data_length = 0U;
-        hPRNTitf->Control_req(req->bRequest, (uint8_t *)req, &data_length);
+        hPRNTitf->Control_req(req->bRequest, (uint8_t *)hPRNT->data, &data_length);
       }
       break;
 
@@ -623,12 +632,6 @@ uint8_t USBD_PRNT_ReceivePacket(USBD_HandleTypeDef *pdev)
 {
   USBD_PRNT_HandleTypeDef *hPRNT = (USBD_PRNT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  PRNTInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  PRNTOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (hPRNT == NULL)
   {
     return (uint8_t)USBD_FAIL;
@@ -637,13 +640,13 @@ uint8_t USBD_PRNT_ReceivePacket(USBD_HandleTypeDef *pdev)
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
     /* Prepare Out endpoint to receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, PRNTOutEpAdd, hPRNT->RxBuffer,
+    (void)USBD_LL_PrepareReceive(pdev, hPRNT->out_ep, hPRNT->RxBuffer,
                                  PRNT_DATA_HS_OUT_PACKET_SIZE);
   }
   else
   {
     /* Prepare Out endpoint to receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, PRNTOutEpAdd, hPRNT->RxBuffer,
+    (void)USBD_LL_PrepareReceive(pdev, hPRNT->out_ep, hPRNT->RxBuffer,
                                  PRNT_DATA_FS_OUT_PACKET_SIZE);
   }
 

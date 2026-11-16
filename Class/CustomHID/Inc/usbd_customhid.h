@@ -129,6 +129,8 @@ typedef struct
   uint32_t AltSetting;
   uint32_t IsReportAvailable;
   CUSTOM_HID_StateTypeDef state;
+  uint8_t  in_ep;
+  uint8_t  out_ep;
 } USBD_CUSTOM_HID_HandleTypeDef;
 
 /*

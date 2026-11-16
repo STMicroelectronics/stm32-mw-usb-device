@@ -297,7 +297,7 @@ typedef struct
 
 typedef struct
 {
-  uint8_t data[CCID_DATA_HS_MAX_PACKET_SIZE / 4U];   /* Force 32-bit alignment */
+  uint32_t data[CCID_DATA_HS_MAX_PACKET_SIZE / sizeof(uint32_t)]; /* Force 32-bit alignment */
   uint32_t UsbMessageLength;
   uint8_t UsbIntData[CCID_CMD_PACKET_SIZE];          /* Buffer for the Interrupt In Data */
   uint32_t alt_setting;
@@ -309,6 +309,9 @@ typedef struct
 
   __IO uint32_t MaxPcktLen;
   __IO uint8_t blkt_state;                           /* Bulk transfer state */
+  uint8_t in_ep;                                     /* Bulk IN endpoint address */
+  uint8_t out_ep;                                    /* Bulk OUT endpoint address */
+  uint8_t cmd_ep;                                    /* Interrupt IN endpoint address */
 
   uint16_t slot_nb;
   uint16_t seq_nb;

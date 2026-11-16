@@ -254,6 +254,10 @@ typedef struct
   uint8_t         CmdLength;
   uint8_t         ResponseRdy;     /* Indicates if the Device Response to an CDC_RNDIS msg is ready */
   uint8_t         Reserved1;       /* Reserved Byte to force 4 bytes alignment of following fields */
+  uint8_t         in_ep;
+  uint8_t         out_ep;
+  uint8_t         cmd_ep;
+  uint8_t         Reserved2;       /* Reserved Byte to force 4 bytes alignment of following fields */
   uint8_t         *RxBuffer;
   uint8_t         *TxBuffer;
   uint32_t        RxLength;
@@ -269,6 +273,12 @@ typedef struct
   __IO uint32_t   LinkStatus;
   __IO uint32_t   NotificationStatus;
   __IO uint32_t   PacketFilter;
+
+  uint8_t         *RxBufferBase;
+  uint32_t        RxBufferSize;
+  uint32_t        RxAssembled;
+  uint32_t        RxStaged;
+  uint32_t        RxPacketBuffer[CDC_RNDIS_DATA_HS_MAX_PACKET_SIZE / 4U];
 } USBD_CDC_RNDIS_HandleTypeDef;
 
 /* Messages Sent by the Host ---------------------*/
@@ -425,6 +435,9 @@ typedef struct
   uint32_t Reserved;
 } USBD_CDC_RNDIS_PacketMsgTypeDef;
 
+/* Largest data message the host may send */
+#define CDC_RNDIS_PACKET_MSG_SIZE_MAX           (sizeof(USBD_CDC_RNDIS_PacketMsgTypeDef) + CDC_RNDIS_ETH_FRAME_SIZE_MAX)
+
 /* Miscellaneous types used for parsing ---------------------*/
 
 /* The common part for all CDC_RNDIS messages Complete response */
@@ -494,6 +507,8 @@ extern USBD_ClassTypeDef USBD_CDC_RNDIS;
   * @{
   */
 uint8_t USBD_CDC_RNDIS_SetRxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff);
+uint8_t USBD_CDC_RNDIS_SetRxBufferEx(USBD_HandleTypeDef *pdev, uint8_t *pbuff,
+                                     uint32_t buffer_size);
 uint8_t USBD_CDC_RNDIS_ReceivePacket(USBD_HandleTypeDef *pdev);
 
 uint8_t USBD_CDC_RNDIS_RegisterInterface(USBD_HandleTypeDef *pdev,
@@ -526,4 +541,3 @@ uint8_t USBD_CDC_RNDIS_SendNotification(USBD_HandleTypeDef *pdev,
 /**
   * @}
   */
-

@@ -57,6 +57,7 @@ extern "C" {
 
 #define SCSI_READ_CAPACITY10                        0x25U
 #define SCSI_READ_CAPACITY16                        0x9EU
+#define SCSI_SYNCHRONIZE_CACHE10                    0x35U
 
 #define SCSI_REQUEST_SENSE                          0x03U
 #define SCSI_START_STOP_UNIT                        0x1BU

@@ -268,10 +268,6 @@ __ALIGN_BEGIN static uint8_t USBD_CDC_CfgDesc[USB_CDC_CONFIG_DESC_SIZ] __ALIGN_E
 };
 #endif /* USE_USBD_COMPOSITE  */
 
-static uint8_t CDCInEpAdd = CDC_IN_EP;
-static uint8_t CDCOutEpAdd = CDC_OUT_EP;
-static uint8_t CDCCmdEpAdd = CDC_CMD_EP;
-
 /**
   * @}
   */
@@ -305,51 +301,55 @@ static uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hcdc;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hcdc->in_ep = CDC_IN_EP;
+  hcdc->out_ep = CDC_OUT_EP;
+  hcdc->cmd_ep = CDC_CMD_EP;
+
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
-  CDCInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CDCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CDCCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+  hcdc->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hcdc->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hcdc->cmd_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
     /* Open EP IN */
-    (void)USBD_LL_OpenEP(pdev, CDCInEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->in_ep, USBD_EP_TYPE_BULK,
                          CDC_DATA_HS_IN_PACKET_SIZE);
 
-    pdev->ep_in[CDCInEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_in[hcdc->in_ep & 0xFU].is_used = 1U;
 
     /* Open EP OUT */
-    (void)USBD_LL_OpenEP(pdev, CDCOutEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->out_ep, USBD_EP_TYPE_BULK,
                          CDC_DATA_HS_OUT_PACKET_SIZE);
 
-    pdev->ep_out[CDCOutEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_out[hcdc->out_ep & 0xFU].is_used = 1U;
 
     /* Set bInterval for CDC CMD Endpoint */
-    pdev->ep_in[CDCCmdEpAdd & 0xFU].bInterval = CDC_HS_BINTERVAL;
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].bInterval = CDC_HS_BINTERVAL;
   }
   else
   {
     /* Open EP IN */
-    (void)USBD_LL_OpenEP(pdev, CDCInEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->in_ep, USBD_EP_TYPE_BULK,
                          CDC_DATA_FS_IN_PACKET_SIZE);
 
-    pdev->ep_in[CDCInEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_in[hcdc->in_ep & 0xFU].is_used = 1U;
 
     /* Open EP OUT */
-    (void)USBD_LL_OpenEP(pdev, CDCOutEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->out_ep, USBD_EP_TYPE_BULK,
                          CDC_DATA_FS_OUT_PACKET_SIZE);
 
-    pdev->ep_out[CDCOutEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_out[hcdc->out_ep & 0xFU].is_used = 1U;
 
     /* Set bInterval for CMD Endpoint */
-    pdev->ep_in[CDCCmdEpAdd & 0xFU].bInterval = CDC_FS_BINTERVAL;
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].bInterval = CDC_FS_BINTERVAL;
   }
 
   /* Open Command IN EP */
-  (void)USBD_LL_OpenEP(pdev, CDCCmdEpAdd, USBD_EP_TYPE_INTR, CDC_CMD_PACKET_SIZE);
-  pdev->ep_in[CDCCmdEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hcdc->cmd_ep, USBD_EP_TYPE_INTR, CDC_CMD_PACKET_SIZE);
+  pdev->ep_in[hcdc->cmd_ep & 0xFU].is_used = 1U;
 
   hcdc->RxBuffer = NULL;
 
@@ -368,13 +368,13 @@ static uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
     /* Prepare Out endpoint to receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, CDCOutEpAdd, hcdc->RxBuffer,
+    (void)USBD_LL_PrepareReceive(pdev, hcdc->out_ep, hcdc->RxBuffer,
                                  CDC_DATA_HS_OUT_PACKET_SIZE);
   }
   else
   {
     /* Prepare Out endpoint to receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, CDCOutEpAdd, hcdc->RxBuffer,
+    (void)USBD_LL_PrepareReceive(pdev, hcdc->out_ep, hcdc->RxBuffer,
                                  CDC_DATA_FS_OUT_PACKET_SIZE);
   }
 
@@ -391,33 +391,26 @@ static uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 static uint8_t USBD_CDC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
+  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this CDC class instance */
-  CDCInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CDCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CDCCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, CDCInEpAdd);
-  pdev->ep_in[CDCInEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP OUT */
-  (void)USBD_LL_CloseEP(pdev, CDCOutEpAdd);
-  pdev->ep_out[CDCOutEpAdd & 0xFU].is_used = 0U;
-
-  /* Close Command IN EP */
-  (void)USBD_LL_CloseEP(pdev, CDCCmdEpAdd);
-  pdev->ep_in[CDCCmdEpAdd & 0xFU].is_used = 0U;
-  pdev->ep_in[CDCCmdEpAdd & 0xFU].bInterval = 0U;
-
-  /* DeInit  physical Interface components */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hcdc != NULL)
   {
+    /* Close EP IN */
+    (void)USBD_LL_CloseEP(pdev, hcdc->in_ep);
+    pdev->ep_in[hcdc->in_ep & 0xFU].is_used = 0U;
+
+    /* Close EP OUT */
+    (void)USBD_LL_CloseEP(pdev, hcdc->out_ep);
+    pdev->ep_out[hcdc->out_ep & 0xFU].is_used = 0U;
+
+    /* Close Command IN EP */
+    (void)USBD_LL_CloseEP(pdev, hcdc->cmd_ep);
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].is_used = 0U;
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].bInterval = 0U;
+
+    /* DeInit  physical Interface components */
     ((USBD_CDC_ItfTypeDef *)pdev->pUserData[pdev->classId])->DeInit();
-    (void)USBD_free(pdev->pClassDataCmsit[pdev->classId]);
+    (void)USBD_free(hcdc);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
     pdev->pClassData = NULL;
   }
@@ -443,6 +436,7 @@ static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev,
 
   if (hcdc == NULL)
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -511,6 +505,14 @@ static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev,
           break;
 
         case USB_REQ_CLEAR_FEATURE:
+          if (req->wValue == USB_FEATURE_EP_HALT)
+          {
+            if (req->wIndex == (uint16_t)hcdc->in_ep)
+            {
+              /* The halted transfer may not complete and clear TxState. */
+              hcdc->TxState = 0U;
+            }
+          }
           break;
 
         default:
@@ -820,11 +822,6 @@ uint8_t USBD_CDC_TransmitPacket(USBD_HandleTypeDef *pdev)
 
   USBD_StatusTypeDef ret = USBD_BUSY;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CDCInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, ClassId);
-#endif  /* USE_USBD_COMPOSITE */
-
   if (hcdc == NULL)
   {
     return (uint8_t)USBD_FAIL;
@@ -836,10 +833,10 @@ uint8_t USBD_CDC_TransmitPacket(USBD_HandleTypeDef *pdev)
     hcdc->TxState = 1U;
 
     /* Update the packet total length */
-    pdev->ep_in[CDCInEpAdd & 0xFU].total_length = hcdc->TxLength;
+    pdev->ep_in[hcdc->in_ep & 0xFU].total_length = hcdc->TxLength;
 
     /* Transmit next packet */
-    (void)USBD_LL_Transmit(pdev, CDCInEpAdd, hcdc->TxBuffer, hcdc->TxLength);
+    (void)USBD_LL_Transmit(pdev, hcdc->in_ep, hcdc->TxBuffer, hcdc->TxLength);
 
     ret = USBD_OK;
   }
@@ -857,12 +854,7 @@ uint8_t USBD_CDC_ReceivePacket(USBD_HandleTypeDef *pdev)
 {
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CDCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  if (pdev->pClassDataCmsit[pdev->classId] == NULL)
+  if (hcdc == NULL)
   {
     return (uint8_t)USBD_FAIL;
   }
@@ -870,13 +862,13 @@ uint8_t USBD_CDC_ReceivePacket(USBD_HandleTypeDef *pdev)
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
     /* Prepare Out endpoint to receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, CDCOutEpAdd, hcdc->RxBuffer,
+    (void)USBD_LL_PrepareReceive(pdev, hcdc->out_ep, hcdc->RxBuffer,
                                  CDC_DATA_HS_OUT_PACKET_SIZE);
   }
   else
   {
     /* Prepare Out endpoint to receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, CDCOutEpAdd, hcdc->RxBuffer,
+    (void)USBD_LL_PrepareReceive(pdev, hcdc->out_ep, hcdc->RxBuffer,
                                  CDC_DATA_FS_OUT_PACKET_SIZE);
   }
 

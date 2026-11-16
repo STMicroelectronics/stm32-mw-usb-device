@@ -89,6 +89,7 @@ typedef struct
   uint32_t IdleState;
   uint32_t AltSetting;
   USBD_HID_StateTypeDef state;
+  uint8_t in_ep;
 } USBD_HID_HandleTypeDef;
 
 /*

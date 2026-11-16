@@ -1165,7 +1165,7 @@ static void  USBD_CMPSIT_AUDIODesc(USBD_HandleTypeDef *pdev, uint32_t pConf, __I
   pSpIfDesc->bDescriptorType = AUDIO_INTERFACE_DESCRIPTOR_TYPE;
   pSpIfDesc->bDescriptorSubtype = AUDIO_CONTROL_HEADER;
   pSpIfDesc->bcdADC = 0x0100U;
-  pSpIfDesc->wTotalLength = 0x0027U;
+  pSpIfDesc->wTotalLength = 0x0028U;
   pSpIfDesc->bInCollection = 0x01U;
   pSpIfDesc->baInterfaceNr = 0x01U;
   *Sze += (uint32_t)sizeof(USBD_IfDescTypeDef);
@@ -1178,8 +1178,8 @@ static void  USBD_CMPSIT_AUDIODesc(USBD_HandleTypeDef *pdev, uint32_t pConf, __I
   pSpInDesc->bTerminalID = 0x01U;
   pSpInDesc->wTerminalType = 0x0101U;
   pSpInDesc->bAssocTerminal = 0x00U;
-  pSpInDesc->bNrChannels = 0x01U;
-  pSpInDesc->wChannelConfig = 0x0000U;
+  pSpInDesc->bNrChannels = 0x02U;
+  pSpInDesc->wChannelConfig = 0x0003U;
   pSpInDesc->iChannelNames = 0x00U;
   pSpInDesc->iTerminal = 0x00U;
   *Sze += (uint32_t)sizeof(USBD_SpeakerInDescTypeDef);
@@ -1192,7 +1192,9 @@ static void  USBD_CMPSIT_AUDIODesc(USBD_HandleTypeDef *pdev, uint32_t pConf, __I
   pSpFDesc->bUnitID = AUDIO_OUT_STREAMING_CTRL;
   pSpFDesc->bSourceID = 0x01U;
   pSpFDesc->bControlSize = 0x01U;
-  pSpFDesc->bmaControls = AUDIO_CONTROL_MUTE;
+  pSpFDesc->bmaControls[0] = (uint8_t)AUDIO_CONTROL_MUTE;
+  pSpFDesc->bmaControls[1] = 0U;
+  pSpFDesc->bmaControls[2] = 0U;
   pSpFDesc->iTerminal = 0x00U;
   *Sze += (uint32_t)sizeof(USBD_SpeakerFeatureDescTypeDef);
 
@@ -1880,5 +1882,3 @@ uint8_t USBD_CMPST_ClearConfDesc(USBD_HandleTypeDef *pdev)
 /**
   * @}
   */
-
-

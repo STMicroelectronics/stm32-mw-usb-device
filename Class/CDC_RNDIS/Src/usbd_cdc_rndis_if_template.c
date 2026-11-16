@@ -258,4 +258,3 @@ static int8_t CDC_RNDIS_Itf_Process(USBD_HandleTypeDef *pdev)
 
   return (0);
 }
-

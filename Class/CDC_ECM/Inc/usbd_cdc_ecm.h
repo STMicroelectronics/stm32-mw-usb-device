@@ -207,6 +207,10 @@ typedef struct
   uint8_t  CmdLength;
   uint8_t  Reserved1;  /* Reserved Byte to force 4 bytes alignment of following fields */
   uint8_t  Reserved2;  /* Reserved Byte to force 4 bytes alignment of following fields */
+  uint8_t  in_ep;
+  uint8_t  out_ep;
+  uint8_t  cmd_ep;
+  uint8_t  Reserved3;  /* Reserved Byte to force 4 bytes alignment of following fields */
   uint8_t  *RxBuffer;
   uint8_t  *TxBuffer;
   uint32_t RxLength;

@@ -381,6 +381,7 @@ typedef struct
   uint8_t                    *uvc_buffer;
   VIDEO_OffsetTypeDef        offset;
   USBD_VIDEO_ControlTypeDef  control;
+  uint8_t                    in_ep;
 } USBD_VIDEO_HandleTypeDef;
 
 typedef struct

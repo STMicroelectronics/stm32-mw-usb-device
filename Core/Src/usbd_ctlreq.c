@@ -83,6 +83,7 @@ static void USBD_GetStatus(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 static void USBD_SetFeature(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 static void USBD_ClrFeature(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 static uint8_t USBD_GetLen(uint8_t *buf);
+static uint8_t USBD_IsInterfaceDeclared(USBD_HandleTypeDef *pdev, uint8_t itf_index);
 
 /**
   * @}
@@ -158,6 +159,28 @@ USBD_StatusTypeDef USBD_StdDevReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef
 }
 
 /**
+  * @brief  USBD_IsInterfaceDeclared
+  *         Check that an interface index is declared by the active configuration descriptor.
+  *         The descriptor is used rather than USBD_MAX_NUM_INTERFACES because applications
+  *         commonly configure that macro below the number of interfaces their class exposes.
+  * @param  pdev: device instance
+  * @param  itf_index: interface index from the setup request
+  * @retval 1 if the interface is declared, 0 otherwise
+  */
+static uint8_t USBD_IsInterfaceDeclared(USBD_HandleTypeDef *pdev, uint8_t itf_index)
+{
+  const USBD_ConfigDescTypeDef *pcfg = (const USBD_ConfigDescTypeDef *)(void *)pdev->pConfDesc;
+  uint8_t itf_count = (uint8_t)USBD_MAX_NUM_INTERFACES;
+
+  if (pcfg != NULL)
+  {
+    itf_count = pcfg->bNumInterfaces;
+  }
+
+  return (itf_index < itf_count) ? 1U : 0U;
+}
+
+/**
   * @brief  USBD_StdItfReq
   *         Handle standard usb interface requests
   * @param  pdev: device instance
@@ -180,7 +203,7 @@ USBD_StatusTypeDef USBD_StdItfReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef
         case USBD_STATE_ADDRESSED:
         case USBD_STATE_CONFIGURED:
 
-          if (LOBYTE(req->wIndex) <= USBD_MAX_NUM_INTERFACES)
+          if (USBD_IsInterfaceDeclared(pdev, LOBYTE(req->wIndex)) != 0U)
           {
             /* Get the class index relative to this interface */
             idx = USBD_CoreFindIF(pdev, LOBYTE(req->wIndex));
@@ -239,6 +262,7 @@ USBD_StatusTypeDef USBD_StdItfReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef
 USBD_StatusTypeDef USBD_StdEPReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
   USBD_EndpointTypeDef *pep;
+  uint16_t status_info;
   uint8_t ep_addr;
   uint8_t idx;
   USBD_StatusTypeDef ret = USBD_OK;
@@ -300,6 +324,13 @@ USBD_StatusTypeDef USBD_StdEPReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 
         case USB_REQ_CLEAR_FEATURE:
 
+          if (((req->wIndex & 0xFF00U) != 0U) || ((ep_addr & 0x70U) != 0U))
+          {
+            USBD_CtlError(pdev, req);
+            ret = USBD_FAIL;
+            break;
+          }
+
           switch (pdev->dev_state)
           {
             case USBD_STATE_ADDRESSED:
@@ -357,7 +388,10 @@ USBD_StatusTypeDef USBD_StdEPReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 
               pep->status = 0x0000U;
 
-              (void)USBD_CtlSendData(pdev, (uint8_t *)&pep->status, 2U);
+              /* GET_STATUS returns a 16-bit value: do not send the bytes that follow the
+                 8-bit endpoint status field (is_used) in the endpoint structure */
+              status_info = (uint16_t)pep->status;
+              (void)USBD_CtlSendData(pdev, (uint8_t *)&status_info, 2U);
               break;
 
             case USBD_STATE_CONFIGURED:
@@ -400,7 +434,8 @@ USBD_StatusTypeDef USBD_StdEPReq(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
                 pep->status = 0x0000U;
               }
 
-              (void)USBD_CtlSendData(pdev, (uint8_t *)&pep->status, 2U);
+              status_info = (uint16_t)pep->status;
+              (void)USBD_CtlSendData(pdev, (uint8_t *)&status_info, 2U);
               break;
 
             default:
@@ -1061,4 +1096,3 @@ static uint8_t USBD_GetLen(uint8_t *buf)
 /**
   * @}
   */
-

@@ -195,9 +195,6 @@ __ALIGN_BEGIN static uint8_t USBD_MSC_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_
 };
 #endif /* USE_USBD_COMPOSITE */
 
-uint8_t MSCInEpAdd  = MSC_EPIN_ADDR;
-uint8_t MSCOutEpAdd = MSC_EPOUT_ADDR;
-
 /**
   * @}
   */
@@ -230,31 +227,33 @@ uint8_t USBD_MSC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hmsc;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hmsc->in_ep = MSC_EPIN_ADDR;
+  hmsc->out_ep = MSC_EPOUT_ADDR;
+
 #ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hmsc->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hmsc->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
     /* Open EP OUT */
-    (void)USBD_LL_OpenEP(pdev, MSCOutEpAdd, USBD_EP_TYPE_BULK, MSC_MAX_HS_PACKET);
-    pdev->ep_out[MSCOutEpAdd & 0xFU].is_used = 1U;
+    (void)USBD_LL_OpenEP(pdev, hmsc->out_ep, USBD_EP_TYPE_BULK, MSC_MAX_HS_PACKET);
+    pdev->ep_out[hmsc->out_ep & 0xFU].is_used = 1U;
 
     /* Open EP IN */
-    (void)USBD_LL_OpenEP(pdev, MSCInEpAdd, USBD_EP_TYPE_BULK, MSC_MAX_HS_PACKET);
-    pdev->ep_in[MSCInEpAdd & 0xFU].is_used = 1U;
+    (void)USBD_LL_OpenEP(pdev, hmsc->in_ep, USBD_EP_TYPE_BULK, MSC_MAX_HS_PACKET);
+    pdev->ep_in[hmsc->in_ep & 0xFU].is_used = 1U;
   }
   else
   {
     /* Open EP OUT */
-    (void)USBD_LL_OpenEP(pdev, MSCOutEpAdd, USBD_EP_TYPE_BULK, MSC_MAX_FS_PACKET);
-    pdev->ep_out[MSCOutEpAdd & 0xFU].is_used = 1U;
+    (void)USBD_LL_OpenEP(pdev, hmsc->out_ep, USBD_EP_TYPE_BULK, MSC_MAX_FS_PACKET);
+    pdev->ep_out[hmsc->out_ep & 0xFU].is_used = 1U;
 
     /* Open EP IN */
-    (void)USBD_LL_OpenEP(pdev, MSCInEpAdd, USBD_EP_TYPE_BULK, MSC_MAX_FS_PACKET);
-    pdev->ep_in[MSCInEpAdd & 0xFU].is_used = 1U;
+    (void)USBD_LL_OpenEP(pdev, hmsc->in_ep, USBD_EP_TYPE_BULK, MSC_MAX_FS_PACKET);
+    pdev->ep_in[hmsc->in_ep & 0xFU].is_used = 1U;
   }
 
   /* Init the BOT  layer */
@@ -273,28 +272,21 @@ uint8_t USBD_MSC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 uint8_t USBD_MSC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close MSC EPs */
-  (void)USBD_LL_CloseEP(pdev, MSCOutEpAdd);
-  pdev->ep_out[MSCOutEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, MSCInEpAdd);
-  pdev->ep_in[MSCInEpAdd & 0xFU].is_used = 0U;
+  USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* Free MSC Class Resources */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hmsc != NULL)
   {
+    /* Close the endpoints owned by this class instance */
+    (void)USBD_LL_CloseEP(pdev, hmsc->out_ep);
+    pdev->ep_out[hmsc->out_ep & 0xFU].is_used = 0U;
+    (void)USBD_LL_CloseEP(pdev, hmsc->in_ep);
+    pdev->ep_in[hmsc->in_ep & 0xFU].is_used = 0U;
+
     /* De-Init the BOT layer */
     MSC_BOT_DeInit(pdev);
 
-    (void)USBD_free(pdev->pClassDataCmsit[pdev->classId]);
+    (void)USBD_free(hmsc);
     pdev->pClassDataCmsit[pdev->classId]  = NULL;
     pdev->pClassData = NULL;
   }
@@ -315,14 +307,9 @@ uint8_t USBD_MSC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
   uint32_t max_lun;
   uint16_t status_info = 0U;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (hmsc == NULL)
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -407,16 +394,26 @@ uint8_t USBD_MSC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
           break;
 
         case USB_REQ_CLEAR_FEATURE:
-          if (pdev->dev_state == USBD_STATE_CONFIGURED)
+          if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) != USB_REQ_RECIPIENT_ENDPOINT)
           {
-            if (req->wValue == USB_FEATURE_EP_HALT)
-            {
-              /* Flush the FIFO */
-              (void)USBD_LL_FlushEP(pdev, (uint8_t)req->wIndex);
+            /* No feature is defined for the interface recipient */
+            USBD_CtlError(pdev, req);
+            ret = USBD_FAIL;
+          }
+          else if ((pdev->dev_state == USBD_STATE_CONFIGURED) &&
+                   (req->wValue == USB_FEATURE_EP_HALT) && (req->wLength == 0U) &&
+                   ((req->wIndex == (uint16_t)hmsc->in_ep) ||
+                    (req->wIndex == (uint16_t)hmsc->out_ep)))
+          {
+            /* Flush the FIFO */
+            (void)USBD_LL_FlushEP(pdev, (uint8_t)req->wIndex);
 
-              /* Handle BOT error */
-              MSC_BOT_CplClrFeature(pdev, (uint8_t)req->wIndex);
-            }
+            /* Handle BOT error */
+            MSC_BOT_CplClrFeature(pdev, (uint8_t)req->wIndex);
+          }
+          else
+          {
+            /* The status stage of an endpoint request is already sent by the core */
           }
           break;
 
@@ -581,4 +578,3 @@ uint8_t USBD_MSC_RegisterStorage(USBD_HandleTypeDef *pdev, USBD_StorageTypeDef *
 /**
   * @}
   */
-

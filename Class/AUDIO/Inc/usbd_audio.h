@@ -61,7 +61,7 @@ extern "C" {
 #define AUDIO_OUT_EP                                  0x01U
 #endif /* AUDIO_OUT_EP */
 
-#define USB_AUDIO_CONFIG_DESC_SIZ                     0x6DU
+#define USB_AUDIO_CONFIG_DESC_SIZ                     0x6EU
 #define AUDIO_INTERFACE_DESC_SIZE                     0x09U
 #define USB_AUDIO_DESC_SIZ                            0x09U
 #define AUDIO_STANDARD_ENDPOINT_DESC_SIZE             0x09U
@@ -106,14 +106,16 @@ extern "C" {
 #define AUDIO_IN_TC                                   0x02U
 
 
-#define AUDIO_OUT_PACKET                              (uint16_t)(((USBD_AUDIO_FREQ * 2U * 2U) / 1000U))
+#define AUDIO_OUT_PACKET_NOMINAL                      (uint16_t)(((USBD_AUDIO_FREQ * 2U * 2U) / 1000U))
+/* Allow one additional stereo 16-bit sample frame in an OUT packet. */
+#define AUDIO_OUT_PACKET                              (uint16_t)(AUDIO_OUT_PACKET_NOMINAL + 4U)
 #define AUDIO_DEFAULT_VOLUME                          70U
 
 /* Number of sub-packets in the audio transfer buffer. You can modify this value but always make sure
   that it is an even number and higher than 3 */
 #define AUDIO_OUT_PACKET_NUM                          80U
 /* Total size of the audio transfer buffer */
-#define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)(AUDIO_OUT_PACKET * AUDIO_OUT_PACKET_NUM))
+#define AUDIO_TOTAL_BUF_SIZE                          ((uint16_t)(AUDIO_OUT_PACKET_NOMINAL * AUDIO_OUT_PACKET_NUM))
 
 /* Audio Commands enumeration */
 typedef enum
@@ -151,9 +153,10 @@ typedef struct
 typedef struct
 {
   uint32_t alt_setting;
-  uint8_t buffer[AUDIO_TOTAL_BUF_SIZE];
+  uint8_t buffer[AUDIO_TOTAL_BUF_SIZE + AUDIO_OUT_PACKET];
   AUDIO_OffsetTypeDef offset;
   uint8_t rd_enable;
+  uint8_t out_ep;
   uint16_t rd_ptr;
   uint16_t wr_ptr;
   USBD_AUDIO_ControlTypeDef control;
@@ -211,7 +214,7 @@ typedef struct
   uint8_t           bUnitID;
   uint8_t           bSourceID;
   uint8_t           bControlSize;
-  uint16_t          bmaControls;
+  uint8_t           bmaControls[3];
   uint8_t           iTerminal;
 } __PACKED USBD_SpeakerFeatureDescTypeDef;
 

@@ -231,8 +231,6 @@ __ALIGN_BEGIN static uint8_t USBD_CUSTOM_HID_DeviceQualifierDesc[USB_LEN_DEV_QUA
 };
 #endif /* USE_USBD_COMPOSITE  */
 
-static uint8_t CUSTOMHIDInEpAdd = CUSTOM_HID_EPIN_ADDR;
-static uint8_t CUSTOMHIDOutEpAdd = CUSTOM_HID_EPOUT_ADDR;
 /**
   * @}
   */
@@ -264,28 +262,31 @@ static uint8_t USBD_CUSTOM_HID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hhid;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hhid->in_ep = CUSTOM_HID_EPIN_ADDR;
+  hhid->out_ep = CUSTOM_HID_EPOUT_ADDR;
+
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
-  CUSTOMHIDInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-  CUSTOMHIDOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+  hhid->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+  hhid->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
-    pdev->ep_in[CUSTOMHIDInEpAdd & 0xFU].bInterval = CUSTOM_HID_HS_BINTERVAL;
-    pdev->ep_out[CUSTOMHIDOutEpAdd & 0xFU].bInterval = CUSTOM_HID_HS_BINTERVAL;
+    pdev->ep_in[hhid->in_ep & 0xFU].bInterval = CUSTOM_HID_HS_BINTERVAL;
+    pdev->ep_out[hhid->out_ep & 0xFU].bInterval = CUSTOM_HID_HS_BINTERVAL;
   }
   else   /* LOW and FULL-speed endpoints */
   {
-    pdev->ep_in[CUSTOMHIDInEpAdd & 0xFU].bInterval = CUSTOM_HID_FS_BINTERVAL;
-    pdev->ep_out[CUSTOMHIDOutEpAdd & 0xFU].bInterval = CUSTOM_HID_FS_BINTERVAL;
+    pdev->ep_in[hhid->in_ep & 0xFU].bInterval = CUSTOM_HID_FS_BINTERVAL;
+    pdev->ep_out[hhid->out_ep & 0xFU].bInterval = CUSTOM_HID_FS_BINTERVAL;
   }
 
   /* Open EP IN */
-  (void)USBD_LL_OpenEP(pdev, CUSTOMHIDInEpAdd, USBD_EP_TYPE_INTR,
+  (void)USBD_LL_OpenEP(pdev, hhid->in_ep, USBD_EP_TYPE_INTR,
                        CUSTOM_HID_EPIN_SIZE);
 
-  pdev->ep_in[CUSTOMHIDInEpAdd & 0xFU].is_used = 1U;
+  pdev->ep_in[hhid->in_ep & 0xFU].is_used = 1U;
 
   if (USBD_CUSTOMHID_OUTREPORT_BUF_SIZE < CUSTOM_HID_EPOUT_SIZE)
   {
@@ -293,10 +294,10 @@ static uint8_t USBD_CUSTOM_HID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   }
 
   /* Open EP OUT */
-  (void)USBD_LL_OpenEP(pdev, CUSTOMHIDOutEpAdd, USBD_EP_TYPE_INTR,
+  (void)USBD_LL_OpenEP(pdev, hhid->out_ep, USBD_EP_TYPE_INTR,
                        CUSTOM_HID_EPOUT_SIZE);
 
-  pdev->ep_out[CUSTOMHIDOutEpAdd & 0xFU].is_used = 1U;
+  pdev->ep_out[hhid->out_ep & 0xFU].is_used = 1U;
 
   hhid->state = CUSTOM_HID_IDLE;
 
@@ -304,7 +305,7 @@ static uint8_t USBD_CUSTOM_HID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 
 #ifndef USBD_CUSTOMHID_OUT_PREPARE_RECEIVE_DISABLED
   /* Prepare Out endpoint to receive 1st packet */
-  (void)USBD_LL_PrepareReceive(pdev, CUSTOMHIDOutEpAdd, hhid->Report_buf,
+  (void)USBD_LL_PrepareReceive(pdev, hhid->out_ep, hhid->Report_buf,
                                USBD_CUSTOMHID_OUTREPORT_BUF_SIZE);
 #endif /* USBD_CUSTOMHID_OUT_PREPARE_RECEIVE_DISABLED */
 
@@ -321,28 +322,23 @@ static uint8_t USBD_CUSTOM_HID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 static uint8_t USBD_CUSTOM_HID_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CUSTOMHIDInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-  CUSTOMHIDOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close CUSTOM_HID EP IN */
-  (void)USBD_LL_CloseEP(pdev, CUSTOMHIDInEpAdd);
-  pdev->ep_in[CUSTOMHIDInEpAdd & 0xFU].is_used = 0U;
-  pdev->ep_in[CUSTOMHIDInEpAdd & 0xFU].bInterval = 0U;
-
-  /* Close CUSTOM_HID EP OUT */
-  (void)USBD_LL_CloseEP(pdev, CUSTOMHIDOutEpAdd);
-  pdev->ep_out[CUSTOMHIDOutEpAdd & 0xFU].is_used = 0U;
-  pdev->ep_out[CUSTOMHIDOutEpAdd & 0xFU].bInterval = 0U;
+  USBD_CUSTOM_HID_HandleTypeDef *hhid = (USBD_CUSTOM_HID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* Free allocated memory */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hhid != NULL)
   {
+    /* Close CUSTOM_HID EP IN */
+    (void)USBD_LL_CloseEP(pdev, hhid->in_ep);
+    pdev->ep_in[hhid->in_ep & 0xFU].is_used = 0U;
+    pdev->ep_in[hhid->in_ep & 0xFU].bInterval = 0U;
+
+    /* Close CUSTOM_HID EP OUT */
+    (void)USBD_LL_CloseEP(pdev, hhid->out_ep);
+    pdev->ep_out[hhid->out_ep & 0xFU].is_used = 0U;
+    pdev->ep_out[hhid->out_ep & 0xFU].bInterval = 0U;
+
     ((USBD_CUSTOM_HID_ItfTypeDef *)pdev->pUserData[pdev->classId])->DeInit();
-    USBD_free(pdev->pClassDataCmsit[pdev->classId]);
+    USBD_free(hhid);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
     pdev->pClassData = NULL;
   }
@@ -369,8 +365,12 @@ static uint8_t USBD_CUSTOM_HID_Setup(USBD_HandleTypeDef *pdev,
   uint16_t status_info = 0U;
   USBD_StatusTypeDef ret = USBD_OK;
 
-  if (hhid == NULL)
+  if ((hhid == NULL) &&
+      (((req->bmRequest & USB_REQ_TYPE_MASK) != USB_REQ_TYPE_STANDARD) ||
+       (req->bRequest != USB_REQ_GET_DESCRIPTOR) ||
+       (pdev->pUserData[pdev->classId] == NULL)))
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -573,17 +573,12 @@ uint8_t USBD_CUSTOM_HID_SendReport(USBD_HandleTypeDef *pdev,
     return (uint8_t)USBD_FAIL;
   }
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get Endpoint IN address allocated for this class instance */
-  CUSTOMHIDInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, ClassId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (pdev->dev_state == USBD_STATE_CONFIGURED)
   {
     if (hhid->state == CUSTOM_HID_IDLE)
     {
       hhid->state = CUSTOM_HID_BUSY;
-      (void)USBD_LL_Transmit(pdev, CUSTOMHIDInEpAdd, report, len);
+      (void)USBD_LL_Transmit(pdev, hhid->in_ep, report, len);
     }
     else
     {
@@ -749,15 +744,10 @@ uint8_t USBD_CUSTOM_HID_ReceivePacket(USBD_HandleTypeDef *pdev)
     return (uint8_t)USBD_FAIL;
   }
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get OUT Endpoint address allocated for this class instance */
-  CUSTOMHIDOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   hhid = (USBD_CUSTOM_HID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* Resume USB Out process */
-  (void)USBD_LL_PrepareReceive(pdev, CUSTOMHIDOutEpAdd, hhid->Report_buf,
+  (void)USBD_LL_PrepareReceive(pdev, hhid->out_ep, hhid->Report_buf,
                                USBD_CUSTOMHID_OUTREPORT_BUF_SIZE);
 
   return (uint8_t)USBD_OK;
@@ -838,4 +828,3 @@ uint8_t USBD_CUSTOM_HID_RegisterInterface(USBD_HandleTypeDef *pdev,
 /**
   * @}
   */
-

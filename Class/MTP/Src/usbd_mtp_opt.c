@@ -24,6 +24,7 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 static uint8_t  ObjInfo_buff[576];
+static uint32_t ObjInfo_received;
 static uint32_t objhandle;
 static uint16_t obj_format;
 static uint32_t storage_id;
@@ -45,6 +46,7 @@ static MTP_DevicePropDescTypeDef MTP_DevicePropDesc;
 static void MTP_Get_DeviceInfo(void);
 static void MTP_Get_StorageIDS(void);
 static void MTP_Get_PayloadContent(USBD_HandleTypeDef *pdev);
+static uint8_t MTP_IsObjInfoComplete(void);
 static void MTP_Get_ObjectInfo(USBD_HandleTypeDef *pdev);
 static void MTP_Get_StorageInfo(USBD_HandleTypeDef *pdev);
 static void MTP_Get_ObjectHandle(USBD_HandleTypeDef *pdev);
@@ -446,6 +448,8 @@ void USBD_MTP_OPT_SendObjectInfo(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint3
   USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   MTP_ObjectInfoTypeDef ObjectInfo;
   uint8_t dataLength = offsetof(MTP_ObjectInfoTypeDef, Filename);
+  uint32_t rx_count;
+  uint8_t complete;
   uint8_t *tmp;
 
   switch (hmtp->RECEIVE_DATA_STATUS)
@@ -465,44 +469,72 @@ void USBD_MTP_OPT_SendObjectInfo(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint3
         objhandle = hmtp->OperationsContainer.Param2;
       }
       storage_id = hmtp->OperationsContainer.Param1;
+
+      /* a new dataset starts: nothing of a previous transaction belongs to it */
+      ObjInfo_received = 0U;
       hmtp->RECEIVE_DATA_STATUS = RECEIVE_FIRST_DATA;
       break;
 
     case RECEIVE_FIRST_DATA:
       tmp = buff;
+      rx_count = MIN(USBD_GetRxCount(pdev, hmtp->out_ep), (uint32_t)hmtp->MaxPcktLen);
 
-      (void)USBD_memcpy(ObjInfo_buff, tmp + 12U,
-                        (uint16_t)MIN(hmtp->MaxPcktLen - MTP_CONT_HEADER_SIZE,
-                                      sizeof(ObjInfo_buff)));
+      /* only the bytes received after the container header belong to the dataset */
+      ObjInfo_received = 0U;
+
+      if (rx_count > MTP_CONT_HEADER_SIZE)
+      {
+        ObjInfo_received = MIN(rx_count - MTP_CONT_HEADER_SIZE, (uint32_t)sizeof(ObjInfo_buff));
+        (void)USBD_memcpy(ObjInfo_buff, tmp + MTP_CONT_HEADER_SIZE, ObjInfo_received);
+      }
 
       hmtp->RECEIVE_DATA_STATUS = RECEIVE_REST_OF_DATA;
       break;
 
     case RECEIVE_REST_OF_DATA:
-      if (len < (uint32_t)sizeof(ObjInfo_buff))
+      /* len is the offset of this packet in the dataset: only contiguous data extends the received dataset */
+      if (len == ObjInfo_received)
       {
-        (void)USBD_memcpy(ObjInfo_buff + len, buff,
-                          (uint16_t)MIN(hmtp->MaxPcktLen,
-                                        sizeof(ObjInfo_buff) - len));
+        rx_count = MIN(USBD_GetRxCount(pdev, hmtp->out_ep), (uint32_t)hmtp->MaxPcktLen);
+        rx_count = MIN(rx_count, (uint32_t)sizeof(ObjInfo_buff) - len);
+
+        (void)USBD_memcpy(ObjInfo_buff + len, buff, rx_count);
+        ObjInfo_received += rx_count;
       }
       break;
 
     case SEND_RESPONSE:
-      (void)USBD_memcpy((uint8_t *)&ObjectInfo, ObjInfo_buff, dataLength);
-      (void)USBD_memcpy((uint8_t *)&ObjectInfo.Filename, (ObjInfo_buff + dataLength),
-                        MIN((uint32_t)(ObjectInfo.Filename_len) * 2U,
-                            (uint32_t)(sizeof(ObjInfo_buff) - dataLength)));
+      complete = MTP_IsObjInfoComplete();
 
-      obj_format = ObjectInfo.ObjectFormat;
+      if (complete != 0U)
+      {
+        (void)USBD_memset(&ObjectInfo, 0, sizeof(ObjectInfo));
+        (void)USBD_memcpy((uint8_t *)&ObjectInfo, ObjInfo_buff, dataLength);
+        (void)USBD_memcpy((uint8_t *)&ObjectInfo.Filename, (ObjInfo_buff + dataLength),
+                          MIN((uint32_t)(ObjectInfo.Filename_len) * 2U,
+                              (uint32_t)(sizeof(ObjInfo_buff) - dataLength)));
 
-      hmtp->ResponseCode = hmtpif->Create_NewObject(ObjectInfo, objhandle);
+        obj_format = ObjectInfo.ObjectFormat;
+
+        hmtp->ResponseCode = hmtpif->Create_NewObject(ObjectInfo, objhandle);
+        hmtp->ResponseLength = MTP_CONT_HEADER_SIZE + (sizeof(uint32_t) * 3U); /* Header + 3 Param */
+      }
+      else
+      {
+        /* missing or truncated dataset: no object is created and no parameter is returned */
+        hmtp->ResponseCode = MTP_RESPONSE_INVALID_DATASET;
+        hmtp->ResponseLength = MTP_CONT_HEADER_SIZE;
+      }
+
       hmtp->GenericContainer.code = (uint16_t)hmtp->ResponseCode;
-      hmtp->ResponseLength = MTP_CONT_HEADER_SIZE + (sizeof(uint32_t) * 3U); /* Header + 3 Param */
       hmtp->GenericContainer.length =  hmtp->ResponseLength;
       hmtp->GenericContainer.type = MTP_CONT_TYPE_RESPONSE;
       hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
 
-      (void)MTP_Get_PayloadContent(pdev);
+      if (complete != 0U)
+      {
+        (void)MTP_Get_PayloadContent(pdev);
+      }
 
       hmtp->RECEIVE_DATA_STATUS = RECEIVE_IDLE_STATE;
       break;
@@ -528,6 +560,26 @@ void USBD_MTP_OPT_DeleteObject(USBD_HandleTypeDef  *pdev)
   hmtp->ResponseLength = MTP_CONT_HEADER_SIZE;
   hmtp->GenericContainer.length =  hmtp->ResponseLength;
   hmtp->ResponseCode = hmtpif->DeleteObject(hmtp->OperationsContainer.Param1);
+}
+
+/**
+  * @brief  MTP_IsObjInfoComplete
+  *         Check that the received ObjectInfo dataset holds its fixed part and the whole filename
+  * @retval 1 if the dataset can be decoded, 0 otherwise
+  */
+static uint8_t MTP_IsObjInfoComplete(void)
+{
+  uint32_t needed = offsetof(MTP_ObjectInfoTypeDef, Filename);
+
+  if (ObjInfo_received < needed)
+  {
+    return 0U;
+  }
+
+  /* Filename_len, the last byte of the fixed part, counts the UTF-16 characters that follow */
+  needed += (uint32_t)ObjInfo_buff[offsetof(MTP_ObjectInfoTypeDef, Filename_len)] * 2U;
+
+  return (ObjInfo_received >= needed) ? 1U : 0U;
 }
 
 /**
@@ -867,6 +919,9 @@ static uint8_t *MTP_Get_ObjectPropValue(USBD_HandleTypeDef *pdev)
 {
   USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
+  uint8_t name_length;
+  uint32_t name_bytes;
+  uint16_t filename[255];
   static uint8_t buf[512];
 
   /* Add all other supported object properties */
@@ -885,14 +940,28 @@ static uint8_t *MTP_Get_ObjectPropValue(USBD_HandleTypeDef *pdev)
       break;
 
     case MTP_OB_PROP_OBJ_FILE_NAME:
-      MTP_FileName.FileName_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
-      hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, MTP_FileName.FileName_len, (uint16_t *)buf);
-      (void)USBD_memcpy(MTP_FileName.FileName, (uint16_t *)buf,
-                        MIN(((uint32_t)MTP_FileName.FileName_len * 2U) + 1U,
-                            sizeof(MTP_FileName.FileName)));
+      name_length = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
 
-      hmtp->ResponseLength = MIN(((uint32_t)MTP_FileName.FileName_len * 2U) + 1U,
-                                 sizeof(MTP_FileName.FileName));
+      if (name_length == 0U)
+      {
+        buf[0] = 0U;
+        hmtp->ResponseLength = 1U;
+        break;
+      }
+
+      name_bytes = (uint32_t)name_length * sizeof(uint16_t);
+
+      if ((name_bytes > sizeof(filename)) || (name_bytes > (sizeof(buf) - 1U)))
+      {
+        hmtp->ResponseCode = MTP_RESPONSE_GENERAL_ERROR;
+        hmtp->ResponseLength = 0U;
+        return buf;
+      }
+
+      hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, name_length, filename);
+      buf[0] = name_length;
+      (void)USBD_memcpy(&buf[1], filename, name_bytes);
+      hmtp->ResponseLength = name_bytes + 1U;
       break;
 
     case MTP_OB_PROP_PARENT_OBJECT :
@@ -960,12 +1029,14 @@ static void MTP_Get_ObjectPropList(USBD_HandleTypeDef  *pdev)
       case MTP_OB_PROP_OBJ_FILE_NAME:
         MTP_PropertiesList.MTP_Properties[i].PropertyCode = MTP_OB_PROP_OBJ_FILE_NAME;
         MTP_PropertiesList.MTP_Properties[i].Datatype = MTP_DATATYPE_STR;
+
         /* MTP_FileName.FileName_len value shall be set before USBD_MTP_FS_GetObjectName */
         MTP_FileName.FileName_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
         hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, MTP_FileName.FileName_len, filename);
-        (void)USBD_memcpy(MTP_FileName.FileName, filename,
-                          MIN(((uint32_t)MTP_FileName.FileName_len * 2U) + 1U,
-                              sizeof(MTP_FileName.FileName)));
+
+        (void)USBD_memcpy((uint8_t *)&MTP_FileName + offsetof(MTP_FileNameTypeDef, FileName), filename,
+                          MIN(((uint32_t)MTP_FileName.FileName_len * 2U), sizeof(MTP_FileName.FileName)));
+
         MTP_PropertiesList.MTP_Properties[i].propval = (uint8_t *)&MTP_FileName;
         break;
 
@@ -986,12 +1057,14 @@ static void MTP_Get_ObjectPropList(USBD_HandleTypeDef  *pdev)
       case MTP_OB_PROP_NAME :
         MTP_PropertiesList.MTP_Properties[i].PropertyCode = MTP_OB_PROP_NAME;
         MTP_PropertiesList.MTP_Properties[i].Datatype = MTP_DATATYPE_STR;
+
         /* MTP_FileName.FileName_len value shall be set before USBD_MTP_FS_GetObjectName */
         MTP_FileName.FileName_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
         hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, MTP_FileName.FileName_len, filename);
-        (void)USBD_memcpy(MTP_FileName.FileName, filename,
-                          MIN(((uint32_t)MTP_FileName.FileName_len * 2U) + 1U,
-                              sizeof(MTP_FileName.FileName)));
+
+        (void)USBD_memcpy((uint8_t *)&MTP_FileName + offsetof(MTP_FileNameTypeDef, FileName), filename,
+                          MIN(((uint32_t)MTP_FileName.FileName_len * 2U), sizeof(MTP_FileName.FileName)));
+
         MTP_PropertiesList.MTP_Properties[i].propval = (uint8_t *)&MTP_FileName;
         break;
 
@@ -1079,9 +1152,9 @@ static void MTP_Get_ObjectInfo(USBD_HandleTypeDef  *pdev)
   /* we have to get this value before MTP_ObjectInfo.Filename */
   MTP_ObjectInfo.Filename_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
   hmtpif->GetObjectName(hmtp->OperationsContainer.Param1, MTP_ObjectInfo.Filename_len, filename);
-  (void)USBD_memcpy(MTP_ObjectInfo.Filename, filename,
-                    MIN(((uint32_t)MTP_ObjectInfo.Filename_len * 2U) + 1U,
-                        sizeof(MTP_ObjectInfo.Filename)));
+
+  (void)USBD_memcpy((uint8_t *)&MTP_ObjectInfo + offsetof(MTP_ObjectInfoTypeDef, Filename), filename,
+                    MIN(((uint32_t)MTP_ObjectInfo.Filename_len * 2U), sizeof(MTP_ObjectInfo.Filename)));
 
   MTP_ObjectInfo.CaptureDate = 0U;
   MTP_ObjectInfo.ModificationDate = 0U;

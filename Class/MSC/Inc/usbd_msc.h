@@ -98,6 +98,8 @@ typedef struct
 {
   uint32_t                 max_lun;
   uint32_t                 interface;
+  uint8_t                  in_ep;
+  uint8_t                  out_ep;
   uint8_t                  bot_state;
   uint8_t                  bot_status;
   uint32_t                 bot_data_length;

@@ -75,6 +75,8 @@ extern "C" {
   * @{
   */
 
+/* Unaligned control IN data is staged per packet using device IDs 0 and 1.
+   Keep multi-packet source buffers valid until the data stage completes. */
 USBD_StatusTypeDef USBD_CtlSendData(USBD_HandleTypeDef *pdev,
                                     uint8_t *pbuf, uint32_t len);
 

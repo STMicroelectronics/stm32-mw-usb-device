@@ -385,6 +385,14 @@ uint8_t  PC_to_RDR_Escape(USBD_HandleTypeDef *pdev)
   {
     return error;
   }
+
+  if (hccid->UsbBlkOutData.dwLength > ABDATA_SIZE)
+  {
+    /* Data length declared by the host exceeds the abData buffer */
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    return SLOTERROR_BAD_DWLENGTH;
+  }
+
   error = SC_Itf_Escape(&hccid->UsbBlkOutData.abData[0], hccid->UsbBlkOutData.dwLength,
                         &hccid->UsbBlkInData.abData[0], &size);
 
@@ -709,6 +717,14 @@ uint8_t  PC_TO_RDR_Secure(USBD_HandleTypeDef *pdev)
   {
     return error;
   }
+
+  if (hccid->UsbBlkOutData.dwLength > ABDATA_SIZE)
+  {
+    /* Data length declared by the host exceeds the abData buffer */
+    CCID_UpdateCommandStatus(pdev, (BM_COMMAND_STATUS_FAILED), (BM_ICC_PRESENT_ACTIVE));
+    return SLOTERROR_BAD_DWLENGTH;
+  }
+
   bBWI = hccid->UsbBlkOutData.bSpecific_0;
   wLevelParameter = (hccid->UsbBlkOutData.bSpecific_1 + ((uint16_t)hccid->UsbBlkOutData.bSpecific_2 << 8));
 

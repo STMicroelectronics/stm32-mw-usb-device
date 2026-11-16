@@ -702,7 +702,11 @@ USBD_StatusTypeDef USBD_LL_DataInStage(USBD_HandleTypeDef *pdev,
         pep->rem_length -= pep->maxpacket;
         pep->pbuffer += pep->maxpacket;
 
-        (void)USBD_CtlContinueSendData(pdev, pep->pbuffer, pep->rem_length);
+        ret = USBD_CtlContinueSendData(pdev, pep->pbuffer, pep->rem_length);
+        if (ret != USBD_OK)
+        {
+          return ret;
+        }
 
         /* Prepare endpoint for premature end of transfer */
         (void)USBD_LL_PrepareReceive(pdev, 0U, NULL, 0U);
@@ -714,7 +718,11 @@ USBD_StatusTypeDef USBD_LL_DataInStage(USBD_HandleTypeDef *pdev,
             (pep->total_length >= pep->maxpacket) &&
             (pep->total_length < pdev->ep0_data_len))
         {
-          (void)USBD_CtlContinueSendData(pdev, NULL, 0U);
+          ret = USBD_CtlContinueSendData(pdev, NULL, 0U);
+          if (ret != USBD_OK)
+          {
+            return ret;
+          }
           pdev->ep0_data_len = 0U;
 
           /* Prepare endpoint for premature end of transfer */

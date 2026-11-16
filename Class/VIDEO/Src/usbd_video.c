@@ -339,8 +339,6 @@ __ALIGN_BEGIN static uint8_t USBD_VIDEO_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIE
 };
 #endif /* USE_USBD_COMPOSITE */
 
-static uint8_t VIDEOinEpAdd = UVC_IN_EP;
-
 /* Video Commit data structure */
 static USBD_VideoControlTypeDef video_Commit_Control =
 {
@@ -415,25 +413,27 @@ static uint8_t USBD_VIDEO_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hVIDEO;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hVIDEO->in_ep = UVC_IN_EP;
+
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
-  VIDEOinEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
+  hVIDEO->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   /* Open EP IN */
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
-    (void)USBD_LL_OpenEP(pdev, VIDEOinEpAdd, USBD_EP_TYPE_ISOC, UVC_ISO_HS_MPS);
+    (void)USBD_LL_OpenEP(pdev, hVIDEO->in_ep, USBD_EP_TYPE_ISOC, UVC_ISO_HS_MPS);
 
-    pdev->ep_in[VIDEOinEpAdd & 0xFU].is_used = 1U;
-    pdev->ep_in[VIDEOinEpAdd & 0xFU].maxpacket = UVC_ISO_HS_MPS;
+    pdev->ep_in[hVIDEO->in_ep & 0xFU].is_used = 1U;
+    pdev->ep_in[hVIDEO->in_ep & 0xFU].maxpacket = UVC_ISO_HS_MPS;
   }
   else
   {
-    (void)USBD_LL_OpenEP(pdev, VIDEOinEpAdd, USBD_EP_TYPE_ISOC, UVC_ISO_FS_MPS);
+    (void)USBD_LL_OpenEP(pdev, hVIDEO->in_ep, USBD_EP_TYPE_ISOC, UVC_ISO_FS_MPS);
 
-    pdev->ep_in[VIDEOinEpAdd & 0xFU].is_used = 1U;
-    pdev->ep_in[VIDEOinEpAdd & 0xFU].maxpacket = UVC_ISO_FS_MPS;
+    pdev->ep_in[hVIDEO->in_ep & 0xFU].is_used = 1U;
+    pdev->ep_in[hVIDEO->in_ep & 0xFU].maxpacket = UVC_ISO_FS_MPS;
   }
 
   /* Init  physical Interface components */
@@ -459,22 +459,19 @@ static uint8_t USBD_VIDEO_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   */
 static uint8_t USBD_VIDEO_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
+  USBD_VIDEO_HandleTypeDef *hVIDEO = (USBD_VIDEO_HandleTypeDef *) pdev->pClassDataCmsit[pdev->classId];
+
   UNUSED(cfgidx);
 
   /* Check if the video structure pointer is valid */
-  if (pdev->pClassDataCmsit[pdev->classId] == NULL)
+  if (hVIDEO == NULL)
   {
     return (uint8_t)USBD_FAIL;
   }
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  VIDEOinEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, VIDEOinEpAdd);
-  pdev->ep_in[VIDEOinEpAdd & 0xFU].is_used = 0U;
+  (void)USBD_LL_CloseEP(pdev, hVIDEO->in_ep);
+  pdev->ep_in[hVIDEO->in_ep & 0xFU].is_used = 0U;
 
   /* DeInit  physical Interface components */
   ((USBD_VIDEO_ItfTypeDef *)pdev->pUserData[pdev->classId])->DeInit();
@@ -501,10 +498,11 @@ static uint8_t USBD_VIDEO_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *
   uint16_t len;
   uint8_t *pbuf;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  VIDEOinEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hVIDEO == NULL)
+  {
+    USBD_CtlError(pdev, req);
+    return (uint8_t)USBD_FAIL;
+  }
 
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
@@ -589,14 +587,14 @@ static uint8_t USBD_VIDEO_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *
               if (hVIDEO->interface == 1U)
               {
                 /* Start Streaming (First endpoint writing will be done on next SOF) */
-                (void)USBD_LL_FlushEP(pdev, VIDEOinEpAdd);
+                (void)USBD_LL_FlushEP(pdev, hVIDEO->in_ep);
                 hVIDEO->uvc_state = UVC_PLAY_STATUS_READY;
               }
               else
               {
                 /* Stop Streaming */
                 hVIDEO->uvc_state = UVC_PLAY_STATUS_STOP;
-                (void)USBD_LL_FlushEP(pdev, VIDEOinEpAdd);
+                (void)USBD_LL_FlushEP(pdev, hVIDEO->in_ep);
               }
             }
             else
@@ -651,10 +649,10 @@ static uint8_t  USBD_VIDEO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
   uint32_t RemainData = 0U;
   uint32_t DataOffset = 0U;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  VIDEOinEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hVIDEO == NULL)
+  {
+    return (uint8_t)USBD_FAIL;
+  }
 
   /* Check if the Streaming has already been started */
   if (hVIDEO->uvc_state == UVC_PLAY_STATUS_STREAMING)
@@ -680,9 +678,9 @@ static uint8_t  USBD_VIDEO_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
         packet[((DataOffset + 0U) * i)] = payload_header[0];
         packet[((DataOffset + 0U) * i) + 1U] = payload_header[1];
 
-        if (RemainData > pdev->ep_in[VIDEOinEpAdd & 0xFU].maxpacket)
+        if (RemainData > pdev->ep_in[hVIDEO->in_ep & 0xFU].maxpacket)
         {
-          DataOffset = pdev->ep_in[VIDEOinEpAdd & 0xFU].maxpacket;
+          DataOffset = pdev->ep_in[hVIDEO->in_ep & 0xFU].maxpacket;
           (void)USBD_memcpy((packet + ((DataOffset + 0U) * i) + 2U),
                             Pcktdata + ((DataOffset - 2U) * i), (DataOffset - 2U));
 
@@ -731,10 +729,10 @@ static uint8_t  USBD_VIDEO_SOF(USBD_HandleTypeDef *pdev)
   USBD_VIDEO_HandleTypeDef *hVIDEO = (USBD_VIDEO_HandleTypeDef *) pdev->pClassDataCmsit[pdev->classId];
   static uint8_t payload[2] = {0x02U, 0x00U};
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  VIDEOinEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hVIDEO == NULL)
+  {
+    return (uint8_t)USBD_FAIL;
+  }
 
   /* Check if the Streaming has already been started by SetInterface AltSetting 1 */
   if (hVIDEO->uvc_state == UVC_PLAY_STATUS_READY)
@@ -743,7 +741,7 @@ static uint8_t  USBD_VIDEO_SOF(USBD_HandleTypeDef *pdev)
     hVIDEO->uvc_size = 2U;
 
     /* Transmit the first packet indicating that Streaming is starting */
-    (void)USBD_LL_Transmit(pdev, VIDEOinEpAdd, hVIDEO->uvc_buffer, hVIDEO->uvc_size);
+    (void)USBD_LL_Transmit(pdev, hVIDEO->in_ep, hVIDEO->uvc_buffer, hVIDEO->uvc_size);
 
     /* Enable Streaming state */
     hVIDEO->uvc_state = UVC_PLAY_STATUS_STREAMING;
@@ -764,14 +762,14 @@ static uint8_t USBD_VIDEO_IsoINIncomplete(USBD_HandleTypeDef *pdev, uint8_t epnu
 {
   USBD_VIDEO_HandleTypeDef *hVIDEO = (USBD_VIDEO_HandleTypeDef *) pdev->pClassDataCmsit[pdev->classId];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  VIDEOinEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_ISOC, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  if (epnum == (VIDEOinEpAdd & 0xFU))
+  if (hVIDEO == NULL)
   {
-    (void)USBD_LL_Transmit(pdev, VIDEOinEpAdd, hVIDEO->uvc_buffer, hVIDEO->uvc_size);
+    return (uint8_t)USBD_FAIL;
+  }
+
+  if (epnum == (hVIDEO->in_ep & 0xFU))
+  {
+    (void)USBD_LL_Transmit(pdev, hVIDEO->in_ep, hVIDEO->uvc_buffer, hVIDEO->uvc_size);
   }
 
   return (uint8_t)USBD_OK;
@@ -906,7 +904,7 @@ static void VIDEO_REQ_SetCurrent(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
   */
 static uint8_t  *USBD_VIDEO_GetFSCfgDesc(uint16_t *length)
 {
-  USBD_EpDescTypeDef *pEpDesc = USBD_GetEpDesc(USBD_VIDEO_CfgDesc, VIDEOinEpAdd);
+  USBD_EpDescTypeDef *pEpDesc = USBD_GetEpDesc(USBD_VIDEO_CfgDesc, UVC_IN_EP);
   USBD_VIDEO_VSFrameDescTypeDef *pVSFrameDesc = USBD_VIDEO_GetVSFrameDesc(USBD_VIDEO_CfgDesc);
 
   if (pEpDesc != NULL)
@@ -934,7 +932,7 @@ static uint8_t  *USBD_VIDEO_GetFSCfgDesc(uint16_t *length)
   */
 static uint8_t  *USBD_VIDEO_GetHSCfgDesc(uint16_t *length)
 {
-  USBD_EpDescTypeDef *pEpDesc = USBD_GetEpDesc(USBD_VIDEO_CfgDesc, VIDEOinEpAdd);
+  USBD_EpDescTypeDef *pEpDesc = USBD_GetEpDesc(USBD_VIDEO_CfgDesc, UVC_IN_EP);
   USBD_VIDEO_VSFrameDescTypeDef *pVSFrameDesc = USBD_VIDEO_GetVSFrameDesc(USBD_VIDEO_CfgDesc);
 
   if (pEpDesc != NULL)
@@ -962,7 +960,7 @@ static uint8_t  *USBD_VIDEO_GetHSCfgDesc(uint16_t *length)
   */
 static uint8_t  *USBD_VIDEO_GetOtherSpeedCfgDesc(uint16_t *length)
 {
-  USBD_EpDescTypeDef *pEpDesc = USBD_GetEpDesc(USBD_VIDEO_CfgDesc, VIDEOinEpAdd);
+  USBD_EpDescTypeDef *pEpDesc = USBD_GetEpDesc(USBD_VIDEO_CfgDesc, UVC_IN_EP);
   USBD_VIDEO_VSFrameDescTypeDef *pVSFrameDesc = USBD_VIDEO_GetVSFrameDesc(USBD_VIDEO_CfgDesc);
 
   if (pEpDesc != NULL)

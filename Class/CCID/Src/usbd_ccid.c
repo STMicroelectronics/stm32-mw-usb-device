@@ -83,8 +83,10 @@ static uint8_t  USBD_CCID_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *
 static uint8_t  USBD_CCID_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
 static uint8_t  USBD_CCID_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
 static uint8_t  USBD_CCID_DispatchCommand(USBD_HandleTypeDef *pdev);
-static uint8_t  USBD_CCID_ReceiveCmdHeader(USBD_HandleTypeDef *pdev,
-                                           uint8_t *pDst, uint16_t u8length);
+static uint8_t  USBD_CCID_ReceiveCmdData(USBD_HandleTypeDef *pdev,
+                                         uint32_t dst_offset, uint16_t length);
+static void     USBD_CCID_DiscardCommand(USBD_HandleTypeDef *pdev, USBD_CCID_HandleTypeDef *hccid);
+static void     USBD_CCID_RejectCommand(USBD_HandleTypeDef *pdev, USBD_CCID_HandleTypeDef *hccid);
 #ifndef USE_USBD_COMPOSITE
 static uint8_t *USBD_CCID_GetHSCfgDesc(uint16_t *length);
 static uint8_t *USBD_CCID_GetFSCfgDesc(uint16_t *length);
@@ -99,11 +101,6 @@ static uint8_t *USBD_CCID_GetDeviceQualifierDescriptor(uint16_t *length);
 /** @defgroup USBD_CCID_Private_Variables
   * @{
   */
-
-static uint8_t CCIDInEpAdd = CCID_IN_EP;
-static uint8_t CCIDOutEpAdd = CCID_OUT_EP;
-static uint8_t CCIDCmdEpAdd = CCID_CMD_EP;
-
 
 /* CCID interface class callbacks structure */
 USBD_ClassTypeDef USBD_CCID =
@@ -290,11 +287,15 @@ static uint8_t USBD_CCID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hccid;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hccid->in_ep = CCID_IN_EP;
+  hccid->out_ep = CCID_OUT_EP;
+  hccid->cmd_ep = CCID_CMD_EP;
+
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
-  CCIDInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CCIDOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CCIDCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+  hccid->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hccid->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hccid->cmd_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   /* Init the CCID parameters into a state where it can receive a new command message */
@@ -305,24 +306,24 @@ static uint8_t USBD_CCID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
                       CCID_DATA_HS_MAX_PACKET_SIZE : CCID_DATA_FS_MAX_PACKET_SIZE;
 
   /* Open EP IN */
-  (void)USBD_LL_OpenEP(pdev, CCIDInEpAdd, USBD_EP_TYPE_BULK, (uint16_t)hccid->MaxPcktLen);
-  pdev->ep_in[CCIDInEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hccid->in_ep, USBD_EP_TYPE_BULK, (uint16_t)hccid->MaxPcktLen);
+  pdev->ep_in[hccid->in_ep & 0xFU].is_used = 1U;
 
   /* Open EP OUT */
-  (void)USBD_LL_OpenEP(pdev, CCIDOutEpAdd, USBD_EP_TYPE_BULK, (uint16_t)hccid->MaxPcktLen);
-  pdev->ep_out[CCIDOutEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hccid->out_ep, USBD_EP_TYPE_BULK, (uint16_t)hccid->MaxPcktLen);
+  pdev->ep_out[hccid->out_ep & 0xFU].is_used = 1U;
 
   /* Open INTR EP IN */
-  (void)USBD_LL_OpenEP(pdev, CCIDCmdEpAdd,
+  (void)USBD_LL_OpenEP(pdev, hccid->cmd_ep,
                        USBD_EP_TYPE_INTR, CCID_CMD_PACKET_SIZE);
-  pdev->ep_in[CCIDCmdEpAdd & 0xFU].is_used = 1U;
+  pdev->ep_in[hccid->cmd_ep & 0xFU].is_used = 1U;
 
   /* Init  physical Interface components */
   ((USBD_CCID_ItfTypeDef *)pdev->pUserData[pdev->classId])->Init(pdev);
 
   /* Prepare Out endpoint to receive next packet */
-  (void)USBD_LL_PrepareReceive(pdev, CCIDOutEpAdd,
-                               hccid->data, hccid->MaxPcktLen);
+  (void)USBD_LL_PrepareReceive(pdev, hccid->out_ep,
+                               (uint8_t *)hccid->data, hccid->MaxPcktLen);
 
   return (uint8_t)USBD_OK;
 }
@@ -337,31 +338,25 @@ static uint8_t USBD_CCID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 static uint8_t USBD_CCID_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CCIDInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CCIDOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CCIDCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, CCIDInEpAdd);
-  pdev->ep_in[CCIDInEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP OUT */
-  (void)USBD_LL_CloseEP(pdev, CCIDOutEpAdd);
-  pdev->ep_out[CCIDOutEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP Command */
-  (void)USBD_LL_CloseEP(pdev, CCIDCmdEpAdd);
-  pdev->ep_in[CCIDCmdEpAdd & 0xFU].is_used = 0U;
+  USBD_CCID_HandleTypeDef *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* DeInit  physical Interface components */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hccid != NULL)
   {
+    /* Close EP IN */
+    (void)USBD_LL_CloseEP(pdev, hccid->in_ep);
+    pdev->ep_in[hccid->in_ep & 0xFU].is_used = 0U;
+
+    /* Close EP OUT */
+    (void)USBD_LL_CloseEP(pdev, hccid->out_ep);
+    pdev->ep_out[hccid->out_ep & 0xFU].is_used = 0U;
+
+    /* Close EP Command */
+    (void)USBD_LL_CloseEP(pdev, hccid->cmd_ep);
+    pdev->ep_in[hccid->cmd_ep & 0xFU].is_used = 0U;
+
     ((USBD_CCID_ItfTypeDef *)pdev->pUserData[pdev->classId])->DeInit(pdev);
-    (void)USBD_free(pdev->pClassDataCmsit[pdev->classId]);
+    (void)USBD_free(hccid);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
     pdev->pClassData = NULL;
   }
@@ -385,6 +380,12 @@ static uint8_t USBD_CCID_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
   uint16_t status_info = 0U;
   uint16_t len;
 
+  if ((hccid == NULL) || (hCCIDitf == NULL))
+  {
+    USBD_CtlError(pdev, req);
+    return (uint8_t)USBD_FAIL;
+  }
+
   switch (req->bmRequest & USB_REQ_TYPE_MASK)
   {
     /* Class request */
@@ -394,12 +395,12 @@ static uint8_t USBD_CCID_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *r
         len = MIN(CCID_EP0_BUFF_SIZ, req->wLength);
         if ((req->bmRequest & 0x80U) != 0U)
         {
-          hCCIDitf->Control(req->bRequest, hccid->data, &len);
-          (void)USBD_CtlSendData(pdev, hccid->data, len);
+          hCCIDitf->Control(req->bRequest, (uint8_t *)hccid->data, &len);
+          (void)USBD_CtlSendData(pdev, (uint8_t *)hccid->data, len);
         }
         else
         {
-          (void)USBD_CtlPrepareRx(pdev, hccid->data, len);
+          (void)USBD_CtlPrepareRx(pdev, (uint8_t *)hccid->data, len);
         }
       }
       else
@@ -475,13 +476,12 @@ static uint8_t USBD_CCID_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
   USBD_CCID_HandleTypeDef *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CCIDInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  CCIDCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hccid == NULL)
+  {
+    return (uint8_t)USBD_EMEM;
+  }
 
-  if (epnum == (CCIDInEpAdd & 0x7FU))
+  if (epnum == (hccid->in_ep & 0x7FU))
   {
     /* Filter the epnum by masking with 0x7f (mask of IN Direction)  */
 
@@ -495,15 +495,15 @@ static uint8_t USBD_CCID_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
         hccid->blkt_state = CCID_STATE_IDLE;
 
         /* Prepare EP to Receive  Cmd */
-        (void)USBD_LL_PrepareReceive(pdev, CCID_OUT_EP,
-                                     hccid->data, hccid->MaxPcktLen);
+        (void)USBD_LL_PrepareReceive(pdev, hccid->out_ep,
+                                     (uint8_t *)hccid->data, hccid->MaxPcktLen);
         break;
 
       default:
         break;
     }
   }
-  else if (epnum == (CCIDCmdEpAdd & 0x7FU))
+  else if (epnum == (hccid->cmd_ep & 0x7FU))
   {
     /* Filter the epnum by masking with 0x7f (mask of IN Direction)  */
 
@@ -530,18 +530,14 @@ static uint8_t USBD_CCID_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
   USBD_CCID_HandleTypeDef  *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t CurrPcktLen;
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CCIDOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  uint32_t expected_length;
 
   if (hccid == NULL)
   {
     return (uint8_t)USBD_EMEM;
   }
 
-  if (epnum == CCIDOutEpAdd)
+  if (epnum == hccid->out_ep)
   {
     CurrPcktLen = (uint16_t)USBD_GetRxCount(pdev, epnum);
 
@@ -549,105 +545,94 @@ static uint8_t USBD_CCID_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
     {
       case CCID_STATE_IDLE:
 
-        if (CurrPcktLen >= (uint16_t)CCID_CMD_HEADER_SIZE)
+        if (CurrPcktLen == 0U)
         {
-          hccid->UsbMessageLength = CurrPcktLen; /* Store for future use */
+          /* Zero-length packet terminating a message that was already processed */
+          USBD_CCID_DiscardCommand(pdev, hccid);
+          break;
+        }
 
-          /* Fill CCID_BulkOut Data Buffer from USB Buffer */
-          (void)USBD_CCID_ReceiveCmdHeader(pdev, (uint8_t *)&hccid->UsbBlkOutData.bMessageType,
-                                           (uint16_t)CurrPcktLen);
+        /* Copy the first packet, bounded by the command buffer */
+        if ((CurrPcktLen < (uint16_t)CCID_CMD_HEADER_SIZE) ||
+            (USBD_CCID_ReceiveCmdData(pdev, 0U, CurrPcktLen) != (uint8_t)USBD_OK))
+        {
+          USBD_CCID_DiscardCommand(pdev, hccid);
+          break;
+        }
 
-          /*
-          Refer : 6 CCID Messages
-          The response messages always contain the exact same slot number,
-          and sequence number fields from the header that was contained in
-          the Bulk-OUT command message.
-          */
-          hccid->UsbBlkInData.bSlot = hccid->UsbBlkOutData.bSlot;
-          hccid->UsbBlkInData.bSeq = hccid->UsbBlkOutData.bSeq;
+        hccid->UsbMessageLength = CurrPcktLen;
 
-          if (CurrPcktLen < hccid->MaxPcktLen)
+        /*
+        Refer : 6 CCID Messages
+        The response messages always contain the exact same slot number,
+        and sequence number fields from the header that was contained in
+        the Bulk-OUT command message.
+        */
+        hccid->UsbBlkInData.bSlot = hccid->UsbBlkOutData.bSlot;
+        hccid->UsbBlkInData.bSeq = hccid->UsbBlkOutData.bSeq;
+
+        if (hccid->UsbBlkOutData.dwLength > (uint32_t)ABDATA_SIZE)
+        {
+          USBD_CCID_RejectCommand(pdev, hccid);
+        }
+        else
+        {
+          expected_length = hccid->UsbBlkOutData.dwLength + (uint32_t)CCID_CMD_HEADER_SIZE;
+
+          if ((uint32_t)CurrPcktLen > expected_length)
           {
-            /* Short message, less than the EP Out Size, execute the command,
-             if parameter like dwLength is too big, the appropriate command will
-             give an error */
+            USBD_CCID_RejectCommand(pdev, hccid);
+          }
+          else if ((uint32_t)CurrPcktLen == expected_length)
+          {
             (void)USBD_CCID_DispatchCommand(pdev);
+          }
+          else if (CurrPcktLen < hccid->MaxPcktLen)
+          {
+            USBD_CCID_RejectCommand(pdev, hccid);
           }
           else
           {
-            /* Check if length of data to be sent by host is > buffer size */
-            if (hccid->UsbBlkOutData.dwLength > (uint32_t)ABDATA_SIZE)
-            {
-              /* Too long data received.... Error ! */
-              hccid->blkt_state = CCID_STATE_UNCORRECT_LENGTH;
-            }
-
-            else
-            {
-              /* Expect more data on OUT EP */
-              hccid->blkt_state = CCID_STATE_RECEIVE_DATA;
-
-              /* Prepare EP to Receive next Cmd */
-              (void)USBD_LL_PrepareReceive(pdev, CCID_OUT_EP,
-                                           hccid->data, hccid->MaxPcktLen);
-
-            } /* if (CurrPcktLen == CCID_DATA_MAX_PACKET_SIZE) ends */
-          } /*  if (CurrPcktLen >= CCID_DATA_MAX_PACKET_SIZE) ends */
-        } /* if (CurrPcktLen >= CCID_CMD_HEADER_SIZE) ends */
-        else
-        {
-          if (CurrPcktLen == 0x00U) /* Zero Length Packet Received */
-          {
-            hccid->blkt_state = CCID_STATE_IDLE;
+            /* Expect more data on OUT EP. */
+            hccid->blkt_state = CCID_STATE_RECEIVE_DATA;
+            (void)USBD_LL_PrepareReceive(pdev, hccid->out_ep,
+                                         (uint8_t *)hccid->data, hccid->MaxPcktLen);
           }
         }
 
         break;
 
       case CCID_STATE_RECEIVE_DATA:
+        /* The declared length was validated against the command buffer with the first packet */
+        if (hccid->UsbBlkOutData.dwLength > (uint32_t)ABDATA_SIZE)
+        {
+          USBD_CCID_DiscardCommand(pdev, hccid);
+          break;
+        }
+
+        expected_length = hccid->UsbBlkOutData.dwLength + (uint32_t)CCID_CMD_HEADER_SIZE;
+        if ((hccid->UsbMessageLength > expected_length) ||
+            ((uint32_t)CurrPcktLen > (expected_length - hccid->UsbMessageLength)) ||
+            (USBD_CCID_ReceiveCmdData(pdev, hccid->UsbMessageLength, CurrPcktLen) != (uint8_t)USBD_OK))
+        {
+          USBD_CCID_RejectCommand(pdev, hccid);
+          break;
+        }
+
         hccid->UsbMessageLength += CurrPcktLen;
 
-        if (CurrPcktLen < hccid->MaxPcktLen)
+        if (hccid->UsbMessageLength == expected_length)
         {
-          /* Short message, less than the EP Out Size, execute the command,
-           if parameter like dwLength is too big, the appropriate command will
-           give an error */
-
-          /* Full command is received, process the Command */
-          (void)USBD_CCID_ReceiveCmdHeader(pdev, (uint8_t *)&hccid->UsbBlkOutData.bMessageType,
-                                           (uint16_t)CurrPcktLen);
-
           (void)USBD_CCID_DispatchCommand(pdev);
         }
-        else if (CurrPcktLen == hccid->MaxPcktLen)
+        else if (CurrPcktLen < hccid->MaxPcktLen)
         {
-          if (hccid->UsbMessageLength < (hccid->UsbBlkOutData.dwLength + (uint32_t)CCID_CMD_HEADER_SIZE))
-          {
-            (void)USBD_CCID_ReceiveCmdHeader(pdev, (uint8_t *)&hccid->UsbBlkOutData.bMessageType,
-                                             (uint16_t)CurrPcktLen); /* Copy data */
-
-            /* Prepare EP to Receive next Cmd */
-            (void)USBD_LL_PrepareReceive(pdev, CCID_OUT_EP,
-                                         hccid->data, hccid->MaxPcktLen);
-          }
-          else if (hccid->UsbMessageLength == (hccid->UsbBlkOutData.dwLength + (uint32_t)CCID_CMD_HEADER_SIZE))
-          {
-            /* Full command is received, process the Command */
-            (void)USBD_CCID_ReceiveCmdHeader(pdev, (uint8_t *)&hccid->UsbBlkOutData.bMessageType,
-                                             (uint16_t)CurrPcktLen);
-
-            (void)USBD_CCID_DispatchCommand(pdev);
-          }
-          else
-          {
-            /* Too long data received.... Error ! */
-            hccid->blkt_state = CCID_STATE_UNCORRECT_LENGTH;
-          }
+          USBD_CCID_RejectCommand(pdev, hccid);
         }
         else
         {
-          /* Too long data received.... Error ! */
-          hccid->blkt_state = CCID_STATE_UNCORRECT_LENGTH;
+          (void)USBD_LL_PrepareReceive(pdev, hccid->out_ep,
+                                       (uint8_t *)hccid->data, hccid->MaxPcktLen);
         }
         break;
 
@@ -784,27 +769,102 @@ uint8_t USBD_CCID_Transfer_Data_Request(USBD_HandleTypeDef *pdev,
 }
 
 /**
-  * @brief  USBD_CCID_ReceiveCmdHeader
-  *         Receive the Data from USB BulkOut Buffer to Pointer
+  * @brief  USBD_CCID_ReceiveCmdData
+  *         Copy one received packet into a bounded offset of the CCID command.
   * @param  pdev: device instance
-  * @param  pDst: destination address to copy the buffer
-  * @param  u8length: length of data to copy
+  * @param  dst_offset: destination offset in the command buffer
+  * @param  length: number of received bytes to copy
   * @retval status
   */
-static uint8_t USBD_CCID_ReceiveCmdHeader(USBD_HandleTypeDef  *pdev,
-                                          uint8_t *pDst, uint16_t u8length)
+static uint8_t USBD_CCID_ReceiveCmdData(USBD_HandleTypeDef  *pdev,
+                                        uint32_t dst_offset, uint16_t length)
 {
   USBD_CCID_HandleTypeDef *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
-  uint8_t *pdst = pDst;
-  uint32_t Counter;
 
-  for (Counter = 0U; Counter < u8length; Counter++)
+  /* MaxPcktLen never exceeds the size of the aligned USB receive buffer */
+  if ((hccid == NULL) ||
+      ((uint32_t)length > hccid->MaxPcktLen) ||
+      (dst_offset > sizeof(hccid->UsbBlkOutData)) ||
+      ((uint32_t)length > (sizeof(hccid->UsbBlkOutData) - dst_offset)))
   {
-    *pdst = hccid->data[Counter];
-    pdst++;
+    return (uint8_t)USBD_FAIL;
   }
 
+  (void)USBD_memcpy((uint8_t *)&hccid->UsbBlkOutData + dst_offset, hccid->data, length);
+
   return (uint8_t)USBD_OK;
+}
+
+/**
+  * @brief  USBD_CCID_DiscardCommand
+  *         Drop a malformed or incomplete command and re-arm the Bulk-OUT endpoint,
+  *         so the next packet is parsed as a new command.
+  * @param  pdev: device instance
+  * @param  hccid: CCID class handle
+  * @retval None
+  */
+static void USBD_CCID_DiscardCommand(USBD_HandleTypeDef *pdev, USBD_CCID_HandleTypeDef *hccid)
+{
+  hccid->UsbMessageLength = 0U;
+  hccid->blkt_state = CCID_STATE_IDLE;
+
+  (void)USBD_LL_PrepareReceive(pdev, hccid->out_ep, (uint8_t *)hccid->data, hccid->MaxPcktLen);
+}
+
+/**
+  * @brief  USBD_CCID_RejectCommand
+  *         Answer a command whose length does not match its dwLength. A CCID command always
+  *         gets a response, so the command is answered with a "bad length" error, whether or not
+  *         its last packet was a full packet. The Bulk-OUT endpoint is armed again once this
+  *         response has been sent (see USBD_CCID_DataIn).
+  * @param  pdev: device instance
+  * @param  hccid: CCID class handle
+  * @retval None
+  */
+static void USBD_CCID_RejectCommand(USBD_HandleTypeDef *pdev, USBD_CCID_HandleTypeDef *hccid)
+{
+  if (hccid->UsbMessageLength < (uint32_t)CCID_CMD_HEADER_SIZE)
+  {
+    USBD_CCID_DiscardCommand(pdev, hccid);
+    return;
+  }
+
+  switch (hccid->UsbBlkOutData.bMessageType)
+  {
+    case PC_TO_RDR_ICCPOWERON:
+    case PC_TO_RDR_XFRBLOCK:
+    case PC_TO_RDR_SECURE:
+      hccid->UsbBlkInData.bMessageType = RDR_TO_PC_DATABLOCK;
+      break;
+
+    case PC_TO_RDR_GETPARAMETERS:
+    case PC_TO_RDR_RESETPARAMETERS:
+    case PC_TO_RDR_SETPARAMETERS:
+      hccid->UsbBlkInData.bMessageType = RDR_TO_PC_PARAMETERS;
+      break;
+
+    case PC_TO_RDR_ESCAPE:
+      hccid->UsbBlkInData.bMessageType = RDR_TO_PC_ESCAPE;
+      break;
+
+    case PC_TO_RDR_SETDATARATEANDCLOCKFREQUENCY:
+      hccid->UsbBlkInData.bMessageType = RDR_TO_PC_DATARATEANDCLOCKFREQUENCY;
+      break;
+
+    default:
+      hccid->UsbBlkInData.bMessageType = RDR_TO_PC_SLOTSTATUS;
+      break;
+  }
+
+  hccid->UsbBlkInData.dwLength = 0U;
+  hccid->UsbBlkInData.bSlot = hccid->UsbBlkOutData.bSlot;
+  hccid->UsbBlkInData.bSeq = hccid->UsbBlkOutData.bSeq;
+  hccid->UsbBlkInData.bStatus = BM_COMMAND_STATUS_FAILED | BM_ICC_PRESENT_ACTIVE;
+  hccid->UsbBlkInData.bError = SLOTERROR_BAD_LENTGH;
+  hccid->UsbBlkInData.bSpecific = 0U;
+
+  (void)USBD_CCID_Transfer_Data_Request(pdev, (uint8_t *)&hccid->UsbBlkInData,
+                                        (uint16_t)CCID_RESPONSE_HEADER_SIZE);
 }
 
 /**
@@ -817,10 +877,10 @@ uint8_t USBD_CCID_IntMessage(USBD_HandleTypeDef  *pdev)
 {
   USBD_CCID_HandleTypeDef *hccid = (USBD_CCID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  CCIDCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hccid == NULL)
+  {
+    return (uint8_t)USBD_FAIL;
+  }
 
   /* Check if there is change in Smartcard Slot status */
   if (CCID_IsSlotStatusChange(pdev) != 0U)
@@ -831,7 +891,7 @@ uint8_t USBD_CCID_IntMessage(USBD_HandleTypeDef  *pdev)
     /* Set the Slot status */
     ((USBD_CCID_ItfTypeDef *)pdev->pUserData[pdev->classId])->SetSlotStatus(pdev);
 
-    (void)USBD_LL_Transmit(pdev, CCIDCmdEpAdd, hccid->UsbIntData, 2U);
+    (void)USBD_LL_Transmit(pdev, hccid->cmd_ep, hccid->UsbIntData, 2U);
   }
   else
   {

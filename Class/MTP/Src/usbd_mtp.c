@@ -87,6 +87,7 @@ static uint8_t USBD_MTP_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
 static uint8_t USBD_MTP_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 static uint8_t USBD_MTP_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
 static uint8_t USBD_MTP_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
+static uint8_t USBD_MTP_AbortReceive(USBD_HandleTypeDef *pdev, USBD_MTP_HandleTypeDef *hmtp);
 
 #ifndef USE_USBD_COMPOSITE
 static uint8_t *USBD_MTP_GetHSCfgDesc(uint16_t *length);
@@ -207,10 +208,6 @@ __ALIGN_BEGIN static uint8_t USBD_MTP_DeviceQualifierDesc[USB_LEN_DEV_QUALIFIER_
 };
 #endif /* USE_USBD_COMPOSITE  */
 
-uint8_t MTPInEpAdd = MTP_IN_EP;
-uint8_t MTPOutEpAdd = MTP_OUT_EP;
-uint8_t MTPCmdEpAdd = MTP_CMD_EP;
-
 /**
   * @}
   */
@@ -243,16 +240,19 @@ static uint8_t USBD_MTP_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hmtp;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MTPInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MTPCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-
   /* Initialize all variables */
   (void)USBD_memset(hmtp, 0, sizeof(USBD_MTP_HandleTypeDef));
+
+  hmtp->in_ep = MTP_IN_EP;
+  hmtp->out_ep = MTP_OUT_EP;
+  hmtp->cmd_ep = MTP_CMD_EP;
+
+#ifdef USE_USBD_COMPOSITE
+  /* Get the Endpoints addresses allocated for this class instance */
+  hmtp->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hmtp->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hmtp->cmd_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+#endif /* USE_USBD_COMPOSITE */
 
   /* Setup the max packet size according to selected speed */
   if (pdev->dev_speed == USBD_SPEED_HIGH)
@@ -265,16 +265,16 @@ static uint8_t USBD_MTP_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   }
 
   /* Open EP IN */
-  (void)USBD_LL_OpenEP(pdev, MTPInEpAdd, USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
-  pdev->ep_in[MTPInEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hmtp->in_ep, USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
+  pdev->ep_in[hmtp->in_ep & 0xFU].is_used = 1U;
 
   /* Open EP OUT */
-  (void)USBD_LL_OpenEP(pdev, MTPOutEpAdd, USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
-  pdev->ep_out[MTPOutEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hmtp->out_ep, USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
+  pdev->ep_out[hmtp->out_ep & 0xFU].is_used = 1U;
 
   /* Open INTR EP IN */
-  (void)USBD_LL_OpenEP(pdev, MTPCmdEpAdd, USBD_EP_TYPE_INTR, MTP_CMD_PACKET_SIZE);
-  pdev->ep_in[MTPCmdEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hmtp->cmd_ep, USBD_EP_TYPE_INTR, MTP_CMD_PACKET_SIZE);
+  pdev->ep_in[hmtp->cmd_ep & 0xFU].is_used = 1U;
 
   /* Init the MTP  layer */
   (void)USBD_MTP_STORAGE_Init(pdev);
@@ -292,33 +292,27 @@ static uint8_t USBD_MTP_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 static uint8_t USBD_MTP_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this MTP class instance */
-  MTPInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MTPCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, MTPInEpAdd);
-  pdev->ep_in[MTPInEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP OUT */
-  (void)USBD_LL_CloseEP(pdev, MTPOutEpAdd);
-  pdev->ep_out[MTPOutEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP Command */
-  (void)USBD_LL_CloseEP(pdev, MTPCmdEpAdd);
-  pdev->ep_in[MTPCmdEpAdd & 0xFU].is_used = 0U;
+  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* Free MTP Class Resources */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hmtp != NULL)
   {
+    /* Close EP IN */
+    (void)USBD_LL_CloseEP(pdev, hmtp->in_ep);
+    pdev->ep_in[hmtp->in_ep & 0xFU].is_used = 0U;
+
+    /* Close EP OUT */
+    (void)USBD_LL_CloseEP(pdev, hmtp->out_ep);
+    pdev->ep_out[hmtp->out_ep & 0xFU].is_used = 0U;
+
+    /* Close EP Command */
+    (void)USBD_LL_CloseEP(pdev, hmtp->cmd_ep);
+    pdev->ep_in[hmtp->cmd_ep & 0xFU].is_used = 0U;
+
     /* De-Init the MTP layer */
     (void)USBD_MTP_STORAGE_DeInit(pdev);
 
-    (void)USBD_free(pdev->pClassDataCmsit[pdev->classId]);
+    (void)USBD_free(hmtp);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
     pdev->pClassData = NULL;
   }
@@ -339,13 +333,9 @@ static uint8_t USBD_MTP_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
   USBD_StatusTypeDef ret = USBD_OK;
   uint16_t len = 0U;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this MTP class instance */
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (hmtp == NULL)
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -367,7 +357,7 @@ static uint8_t USBD_MTP_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
           /* Stop low layer file system operations if any */
           USBD_MTP_STORAGE_Cancel(pdev, MTP_PHASE_IDLE);
 
-          (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff, hmtp->MaxPcktLen);
+          (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, hmtp->MaxPcktLen);
           break;
 
         case MTP_REQ_GET_DEVICE_STATUS:
@@ -424,16 +414,25 @@ static uint8_t USBD_MTP_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
 
         case USB_REQ_CLEAR_FEATURE:
 
-          /* Re-activate the EP */
-          (void)USBD_LL_CloseEP(pdev, (uint8_t)req->wIndex);
-
-          if ((((uint8_t)req->wIndex) & 0x80U) == 0x80U)
+          /* Only an ENDPOINT_HALT clear on one of the MTP bulk endpoints re-activates the EP;
+             interface-recipient requests and other endpoints (EP0, interrupt) are left untouched */
+          if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) != USB_REQ_RECIPIENT_ENDPOINT)
           {
-            (void)USBD_LL_OpenEP(pdev, ((uint8_t)req->wIndex), USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
+            USBD_CtlError(pdev, req);
+            ret = USBD_FAIL;
           }
-          else
+          else if ((req->wValue == USB_FEATURE_EP_HALT) && (req->wLength == 0U) &&
+                   ((req->wIndex == (uint16_t)hmtp->in_ep) ||
+                    (req->wIndex == (uint16_t)hmtp->out_ep)))
           {
-            (void)USBD_LL_OpenEP(pdev, ((uint8_t)req->wIndex), USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
+            (void)USBD_LL_CloseEP(pdev, (uint8_t)req->wIndex);
+            (void)USBD_LL_OpenEP(pdev, (uint8_t)req->wIndex, USBD_EP_TYPE_BULK, hmtp->MaxPcktLen);
+
+            if (req->wIndex == (uint16_t)hmtp->out_ep)
+            {
+              (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff,
+                                           hmtp->MaxPcktLen);
+            }
           }
           break;
 
@@ -461,13 +460,12 @@ static uint8_t USBD_MTP_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
   USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t len;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this MTP class instance */
-  MTPInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hmtp == NULL)
+  {
+    return (uint8_t)USBD_EMEM;
+  }
 
-  if (epnum == (MTPInEpAdd & 0x7FU))
+  if (epnum == (hmtp->in_ep & 0x7FU))
   {
     switch (hmtp->MTP_ResponsePhase)
     {
@@ -475,9 +473,9 @@ static uint8_t USBD_MTP_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
         (void)USBD_MTP_STORAGE_SendContainer(pdev, REP_TYPE);
 
         /* prepare to receive next operation */
-        len = MIN(hmtp->MaxPcktLen, pdev->request.wLength);
+        len = hmtp->MaxPcktLen;
 
-        (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff, len);
+        (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, len);
         hmtp->MTP_ResponsePhase = MTP_PHASE_IDLE;
         break;
 
@@ -485,16 +483,16 @@ static uint8_t USBD_MTP_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
         (void)USBD_MTP_STORAGE_ReadData(pdev);
 
         /* prepare to receive next operation */
-        len = MIN(hmtp->MaxPcktLen, pdev->request.wLength);
+        len = hmtp->MaxPcktLen;
 
-        (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff, len);
+        (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, len);
         break;
 
       case MTP_PHASE_IDLE :
         /* prepare to receive next operation */
-        len = MIN(hmtp->MaxPcktLen, pdev->request.wLength);
+        len = hmtp->MaxPcktLen;
 
-        (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff, len);
+        (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, len);
 
         break;
       default:
@@ -502,6 +500,41 @@ static uint8_t USBD_MTP_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
     }
   }
   return (uint8_t)USBD_OK;
+}
+
+/**
+  * @brief  USBD_MTP_AbortReceive
+  *         Cancel a malformed OUT transaction and recover its transport state.
+  * @param  pdev: device instance
+  * @param  hmtp: MTP class handle
+  * @retval status
+  */
+static uint8_t USBD_MTP_AbortReceive(USBD_HandleTypeDef *pdev, USBD_MTP_HandleTypeDef *hmtp)
+{
+  /* MTP_ResponsePhase keeps MTP_RECEIVE_DATA after an OUT transaction completed, only the receive state
+     tells that a DATA phase is really in progress */
+  uint8_t data_phase_active = ((hmtp->RECEIVE_DATA_STATUS == RECEIVE_FIRST_DATA) ||
+                               (hmtp->RECEIVE_DATA_STATUS == RECEIVE_REST_OF_DATA)) ? 1U : 0U;
+
+  USBD_MTP_STORAGE_Cancel(pdev, (data_phase_active != 0U) ? MTP_RECEIVE_DATA : MTP_PHASE_IDLE);
+
+  if (data_phase_active != 0U)
+  {
+    hmtp->ResponseCode = MTP_RESPONSE_GENERAL_ERROR;
+    hmtp->ResponseLength = MTP_CONT_HEADER_SIZE;
+    hmtp->GenericContainer.length = MTP_CONT_HEADER_SIZE;
+    hmtp->GenericContainer.type = MTP_CONT_TYPE_RESPONSE;
+    hmtp->GenericContainer.trans_id = hmtp->active_transaction_id;
+    hmtp->MTP_ResponsePhase = MTP_RESPONSE_PHASE;
+    (void)USBD_MTP_STORAGE_SendContainer(pdev, REP_TYPE);
+    hmtp->MTP_ResponsePhase = MTP_PHASE_IDLE;
+
+    return (uint8_t)USBD_OK;
+  }
+
+  (void)USBD_LL_StallEP(pdev, hmtp->out_ep);
+
+  return (uint8_t)USBD_FAIL;
 }
 
 /**
@@ -517,12 +550,25 @@ static uint8_t USBD_MTP_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
   USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t len;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this MTP class instance */
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  if (hmtp == NULL)
+  {
+    return (uint8_t)USBD_EMEM;
+  }
 
-  (void)USBD_MTP_STORAGE_ReceiveOpt(pdev);
+  /* A zero-length packet only terminates a transfer whose length is an exact multiple of the
+     packet size. When no container is being received it carries nothing: keep the endpoint armed. */
+  if ((hmtp->RECEIVE_DATA_STATUS == RECEIVE_IDLE_STATE) && (USBD_GetRxCount(pdev, hmtp->out_ep) == 0U))
+  {
+    len = hmtp->MaxPcktLen;
+
+    (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, len);
+    return (uint8_t)USBD_OK;
+  }
+
+  if (USBD_MTP_STORAGE_ReceiveOpt(pdev) != (uint8_t)USBD_OK)
+  {
+    return USBD_MTP_AbortReceive(pdev, hmtp);
+  }
 
   switch (hmtp->MTP_ResponsePhase)
   {
@@ -544,19 +590,22 @@ static uint8_t USBD_MTP_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
       break;
 
     case MTP_RECEIVE_DATA :
-      (void)USBD_MTP_STORAGE_ReceiveData(pdev);
+      if (USBD_MTP_STORAGE_ReceiveData(pdev) != (uint8_t)USBD_OK)
+      {
+        return USBD_MTP_AbortReceive(pdev, hmtp);
+      }
 
       /* prepare endpoint to receive operations */
-      len = MIN(hmtp->MaxPcktLen, pdev->request.wLength);
+      len = hmtp->MaxPcktLen;
 
-      (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff, len);
+      (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, len);
       break;
 
     case MTP_PHASE_IDLE :
       /* prepare to receive next operation */
-      len = MIN(hmtp->MaxPcktLen, pdev->request.wLength);
+      len = hmtp->MaxPcktLen;
 
-      (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff, len);
+      (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff, len);
       break;
 
     default:
@@ -701,4 +750,3 @@ uint8_t USBD_MTP_RegisterInterface(USBD_HandleTypeDef *pdev, USBD_MTP_ItfTypeDef
 /**
   * @}
   */
-

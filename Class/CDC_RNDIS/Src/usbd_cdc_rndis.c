@@ -126,7 +126,10 @@ static uint8_t USBD_CDC_RNDIS_ProcessKeepAliveMsg(USBD_HandleTypeDef *pdev, USBD
 static uint8_t USBD_CDC_RNDIS_ProcessQueryMsg(USBD_HandleTypeDef *pdev, USBD_CDC_RNDIS_QueryMsgTypeDef *Msg);
 static uint8_t USBD_CDC_RNDIS_ProcessSetMsg(USBD_HandleTypeDef *pdev, USBD_CDC_RNDIS_SetMsgTypeDef *Msg);
 static uint8_t USBD_CDC_RNDIS_ProcessResetMsg(USBD_HandleTypeDef *pdev, USBD_CDC_RNDIS_ResetMsgTypeDef *Msg);
-static uint8_t USBD_CDC_RNDIS_ProcessPacketMsg(USBD_HandleTypeDef *pdev, USBD_CDC_RNDIS_PacketMsgTypeDef *Msg);
+static uint8_t USBD_CDC_RNDIS_ProcessPacketMsg(USBD_HandleTypeDef *pdev,
+                                               uint8_t *buffer, uint32_t received_length);
+static uint8_t USBD_CDC_RNDIS_PrepareReceive(USBD_HandleTypeDef *pdev,
+                                             USBD_CDC_RNDIS_HandleTypeDef *hcdc);
 static uint8_t USBD_CDC_RNDIS_ProcessUnsupportedMsg(USBD_HandleTypeDef *pdev, USBD_CDC_RNDIS_CtrlMsgTypeDef *Msg);
 
 /* USB Standard Device Descriptor */
@@ -304,10 +307,6 @@ __ALIGN_BEGIN static uint8_t  USBD_CDC_RNDIS_CfgDesc[] __ALIGN_END =
 } ;
 #endif /* USE_USBD_COMPOSITE */
 
-static uint8_t RNDISInEpAdd = CDC_RNDIS_IN_EP;
-static uint8_t RNDISOutEpAdd = CDC_RNDIS_OUT_EP;
-static uint8_t RNDISCmdEpAdd = CDC_RNDIS_CMD_EP;
-
 static const uint32_t CDC_RNDIS_SupportedOIDs[] =
 {
   OID_GEN_SUPPORTED_LIST,
@@ -355,13 +354,6 @@ static uint8_t USBD_CDC_RNDIS_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 
   hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)USBD_malloc(sizeof(USBD_CDC_RNDIS_HandleTypeDef));
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  RNDISOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  RNDISCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (hcdc == NULL)
   {
     pdev->pClassDataCmsit[pdev->classId] = NULL;
@@ -373,46 +365,61 @@ static uint8_t USBD_CDC_RNDIS_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hcdc;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hcdc->in_ep = CDC_RNDIS_IN_EP;
+  hcdc->out_ep = CDC_RNDIS_OUT_EP;
+  hcdc->cmd_ep = CDC_RNDIS_CMD_EP;
+
+#ifdef USE_USBD_COMPOSITE
+  /* Get the Endpoints addresses allocated for this class instance */
+  hcdc->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hcdc->out_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
+  hcdc->cmd_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+#endif /* USE_USBD_COMPOSITE */
+
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
     /* Open EP IN */
-    (void)USBD_LL_OpenEP(pdev, RNDISInEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->in_ep, USBD_EP_TYPE_BULK,
                          CDC_RNDIS_DATA_HS_IN_PACKET_SIZE);
 
-    pdev->ep_in[RNDISInEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_in[hcdc->in_ep & 0xFU].is_used = 1U;
 
     /* Open EP OUT */
-    (void)USBD_LL_OpenEP(pdev, RNDISOutEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->out_ep, USBD_EP_TYPE_BULK,
                          CDC_RNDIS_DATA_HS_OUT_PACKET_SIZE);
 
-    pdev->ep_out[RNDISOutEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_out[hcdc->out_ep & 0xFU].is_used = 1U;
 
     /* Set bInterval for CDC RNDIS CMD Endpoint */
-    pdev->ep_in[RNDISCmdEpAdd & 0xFU].bInterval = CDC_RNDIS_HS_BINTERVAL;
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].bInterval = CDC_RNDIS_HS_BINTERVAL;
   }
   else
   {
     /* Open EP IN */
-    (void)USBD_LL_OpenEP(pdev, RNDISInEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->in_ep, USBD_EP_TYPE_BULK,
                          CDC_RNDIS_DATA_FS_IN_PACKET_SIZE);
 
-    pdev->ep_in[RNDISInEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_in[hcdc->in_ep & 0xFU].is_used = 1U;
 
     /* Open EP OUT */
-    (void)USBD_LL_OpenEP(pdev, RNDISOutEpAdd, USBD_EP_TYPE_BULK,
+    (void)USBD_LL_OpenEP(pdev, hcdc->out_ep, USBD_EP_TYPE_BULK,
                          CDC_RNDIS_DATA_FS_OUT_PACKET_SIZE);
 
-    pdev->ep_out[RNDISOutEpAdd & 0xFU].is_used = 1U;
+    pdev->ep_out[hcdc->out_ep & 0xFU].is_used = 1U;
 
     /* Set bInterval for CDC RNDIS CMD Endpoint */
-    pdev->ep_in[RNDISCmdEpAdd & 0xFU].bInterval = CDC_RNDIS_FS_BINTERVAL;
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].bInterval = CDC_RNDIS_FS_BINTERVAL;
   }
 
   /* Open Command IN EP */
-  (void)USBD_LL_OpenEP(pdev, RNDISCmdEpAdd, USBD_EP_TYPE_INTR, CDC_RNDIS_CMD_PACKET_SIZE);
-  pdev->ep_in[RNDISCmdEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hcdc->cmd_ep, USBD_EP_TYPE_INTR, CDC_RNDIS_CMD_PACKET_SIZE);
+  pdev->ep_in[hcdc->cmd_ep & 0xFU].is_used = 1U;
 
   hcdc->RxBuffer = NULL;
+  hcdc->RxBufferBase = NULL;
+  hcdc->RxBufferSize = 0U;
+  hcdc->RxAssembled = 0U;
+  hcdc->RxStaged = 0U;
 
   /* Init  physical Interface components */
   ((USBD_CDC_RNDIS_ItfTypeDef *)pdev->pUserData[pdev->classId])->Init();
@@ -430,16 +437,13 @@ static uint8_t USBD_CDC_RNDIS_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   hcdc->MaxPcktLen = (pdev->dev_speed == USBD_SPEED_HIGH) ? CDC_RNDIS_DATA_HS_MAX_PACKET_SIZE : \
                      CDC_RNDIS_DATA_FS_MAX_PACKET_SIZE;
 
-  if (hcdc->RxBuffer == NULL)
+  if ((hcdc->RxBufferBase == NULL) ||
+      (hcdc->RxBufferSize < sizeof(USBD_CDC_RNDIS_PacketMsgTypeDef)))
   {
     return (uint8_t)USBD_EMEM;
   }
 
-  /* Prepare Out endpoint to receive next packet */
-  (void)USBD_LL_PrepareReceive(pdev, RNDISOutEpAdd,
-                               hcdc->RxBuffer, hcdc->MaxPcktLen);
-
-  return (uint8_t)USBD_OK;
+  return USBD_CDC_RNDIS_ReceivePacket(pdev);
 }
 
 /**
@@ -452,32 +456,26 @@ static uint8_t USBD_CDC_RNDIS_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 static uint8_t USBD_CDC_RNDIS_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  RNDISOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-  RNDISCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close EP IN */
-  (void)USBD_LL_CloseEP(pdev, RNDISInEpAdd);
-  pdev->ep_in[RNDISInEpAdd & 0xFU].is_used = 0U;
-
-  /* Close EP OUT */
-  (void)USBD_LL_CloseEP(pdev, RNDISOutEpAdd);
-  pdev->ep_out[RNDISOutEpAdd & 0xFU].is_used = 0U;
-
-  /* Close Command IN EP */
-  (void)USBD_LL_CloseEP(pdev, RNDISCmdEpAdd);
-  pdev->ep_in[RNDISCmdEpAdd & 0xFU].is_used = 0U;
-  pdev->ep_in[RNDISCmdEpAdd & 0xFU].bInterval = 0U;
+  USBD_CDC_RNDIS_HandleTypeDef *hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* DeInit  physical Interface components */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hcdc != NULL)
   {
+    /* Close EP IN */
+    (void)USBD_LL_CloseEP(pdev, hcdc->in_ep);
+    pdev->ep_in[hcdc->in_ep & 0xFU].is_used = 0U;
+
+    /* Close EP OUT */
+    (void)USBD_LL_CloseEP(pdev, hcdc->out_ep);
+    pdev->ep_out[hcdc->out_ep & 0xFU].is_used = 0U;
+
+    /* Close Command IN EP */
+    (void)USBD_LL_CloseEP(pdev, hcdc->cmd_ep);
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].is_used = 0U;
+    pdev->ep_in[hcdc->cmd_ep & 0xFU].bInterval = 0U;
+
     ((USBD_CDC_RNDIS_ItfTypeDef *)pdev->pUserData[pdev->classId])->DeInit();
-    USBD_free(pdev->pClassDataCmsit[pdev->classId]);
+    USBD_free(hcdc);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
     pdev->pClassData = NULL;
   }
@@ -503,6 +501,7 @@ static uint8_t USBD_CDC_RNDIS_Setup(USBD_HandleTypeDef *pdev,
 
   if (hcdc == NULL)
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -636,11 +635,6 @@ static uint8_t USBD_CDC_RNDIS_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
   USBD_CDC_RNDIS_HandleTypeDef *hcdc;
   PCD_HandleTypeDef *hpcd = (PCD_HandleTypeDef *)pdev->pData;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (pdev->pClassDataCmsit[pdev->classId] == NULL)
   {
     return (uint8_t)USBD_FAIL;
@@ -648,7 +642,7 @@ static uint8_t USBD_CDC_RNDIS_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 
   hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-  if (epnum == (RNDISInEpAdd & 0x7FU))
+  if (epnum == (hcdc->in_ep & 0x7FU))
   {
     if ((pdev->ep_in[epnum & 0xFU].total_length > 0U) &&
         ((pdev->ep_in[epnum & 0xFU].total_length % hpcd->IN_ep[epnum & 0xFU].maxpacket) == 0U))
@@ -670,7 +664,7 @@ static uint8_t USBD_CDC_RNDIS_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
       }
     }
   }
-  else if (epnum == (RNDISCmdEpAdd & 0x7FU))
+  else if (epnum == (hcdc->cmd_ep & 0x7FU))
   {
     if (hcdc->NotificationStatus != 0U)
     {
@@ -698,11 +692,9 @@ static uint8_t USBD_CDC_RNDIS_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 static uint8_t USBD_CDC_RNDIS_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
   USBD_CDC_RNDIS_HandleTypeDef *hcdc;
+  USBD_CDC_RNDIS_PacketMsgTypeDef packet_msg;
   uint32_t CurrPcktLen;
-
-#ifdef USE_USBD_COMPOSITE  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  uint8_t message_complete = 0U;
 
   if (pdev->pClassDataCmsit[pdev->classId] == NULL)
   {
@@ -711,30 +703,80 @@ static uint8_t USBD_CDC_RNDIS_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 
   hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-  if (epnum == RNDISOutEpAdd)
+  if (epnum == hcdc->out_ep)
   {
     /* Get the received data length */
     CurrPcktLen = USBD_LL_GetRxDataSize(pdev, epnum);
 
-    /* Increment the frame length */
-    hcdc->RxLength += CurrPcktLen;
+    if ((CurrPcktLen > hcdc->MaxPcktLen) ||
+        (hcdc->RxAssembled > hcdc->RxBufferSize) ||
+        (CurrPcktLen > (hcdc->RxBufferSize - hcdc->RxAssembled)))
+    {
+      USBD_ErrLog("CDC_RNDIS: received packet exceeds the registered RX buffer capacity");
+      hcdc->RxAssembled = 0U;
+      hcdc->RxBuffer = hcdc->RxBufferBase;
+      (void)USBD_CDC_RNDIS_PrepareReceive(pdev, hcdc);
+      return (uint8_t)USBD_FAIL;
+    }
 
-    /* If the buffer size is less than max packet size: it is the last packet in current frame */
+    if ((CurrPcktLen == 0U) && (hcdc->RxAssembled == 0U))
+    {
+      return USBD_CDC_RNDIS_PrepareReceive(pdev, hcdc);
+    }
+
+    if ((hcdc->RxStaged != 0U) && (CurrPcktLen > 0U))
+    {
+      (void)USBD_memcpy(hcdc->RxBufferBase + hcdc->RxAssembled,
+                        (uint8_t *)hcdc->RxPacketBuffer, CurrPcktLen);
+    }
+
+    /* Increment the message length only after the entire packet fits the registered buffer. */
+    hcdc->RxAssembled += CurrPcktLen;
+
+    /* A full-size final packet has no short-packet marker when MsgLength matches it exactly. */
+    if (hcdc->RxAssembled >= sizeof(packet_msg))
+    {
+      (void)USBD_memcpy(&packet_msg, hcdc->RxBufferBase, sizeof(packet_msg));
+      message_complete = (packet_msg.MsgLength == hcdc->RxAssembled) ? 1U : 0U;
+    }
+
+    /* Process at the RNDIS message boundary or the USB transfer's short-packet boundary. */
     if ((CurrPcktLen < hcdc->MaxPcktLen) ||
-        (hcdc->RxLength >= (CDC_RNDIS_ETH_MAX_SEGSZE + sizeof(USBD_CDC_RNDIS_PacketMsgTypeDef))))
+        (message_complete != 0U) ||
+        (hcdc->RxAssembled >= (CDC_RNDIS_ETH_MAX_SEGSZE + sizeof(USBD_CDC_RNDIS_PacketMsgTypeDef))))
     {
       /* USB data will be immediately processed, this allow next USB traffic being
       NAKed till the end of the application Xfer */
 
+      /* The message is handed over: the next transfer, armed by the application or by the class, starts a new one */
+      uint32_t received_length = hcdc->RxAssembled;
+      hcdc->RxAssembled = 0U;
+      hcdc->RxStaged = 0U;
+
       /* Call data packet message parsing and processing function */
-      (void)USBD_CDC_RNDIS_ProcessPacketMsg(pdev, (USBD_CDC_RNDIS_PacketMsgTypeDef *)(void *)hcdc->RxBuffer);
+      if (USBD_CDC_RNDIS_ProcessPacketMsg(pdev, hcdc->RxBufferBase, received_length) != (uint8_t)USBD_OK)
+      {
+        USBD_ErrLog("CDC_RNDIS: malformed packet message or payload outside received bytes");
+        hcdc->RxBuffer = hcdc->RxBufferBase;
+        (void)USBD_CDC_RNDIS_PrepareReceive(pdev, hcdc);
+        return (uint8_t)USBD_FAIL;
+      }
+    }
+    else if (hcdc->RxAssembled == hcdc->RxBufferSize)
+    {
+      USBD_ErrLog("CDC_RNDIS: incomplete frame exhausted the registered RX buffer");
+      hcdc->RxAssembled = 0U;
+      hcdc->RxBuffer = hcdc->RxBufferBase;
+      (void)USBD_CDC_RNDIS_PrepareReceive(pdev, hcdc);
+      return (uint8_t)USBD_FAIL;
     }
     else
     {
       /* Prepare Out endpoint to receive next packet in current/new frame */
-      (void)USBD_LL_PrepareReceive(pdev, RNDISOutEpAdd,
-                                   (uint8_t *)(hcdc->RxBuffer + hcdc->RxLength),
-                                   hcdc->MaxPcktLen);
+      if (USBD_CDC_RNDIS_PrepareReceive(pdev, hcdc) != (uint8_t)USBD_OK)
+      {
+        return (uint8_t)USBD_FAIL;
+      }
     }
   }
   else
@@ -972,20 +1014,38 @@ uint8_t USBD_CDC_RNDIS_SetTxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff, uin
 
 /**
   * @brief  USBD_CDC_RNDIS_SetRxBuffer
+  *         The buffer is taken to hold at least CDC_RNDIS_PACKET_MSG_SIZE_MAX bytes
   * @param  pdev: device instance
   * @param  pbuff: Rx Buffer
   * @retval status
   */
 uint8_t USBD_CDC_RNDIS_SetRxBuffer(USBD_HandleTypeDef *pdev, uint8_t *pbuff)
 {
+  return USBD_CDC_RNDIS_SetRxBufferEx(pdev, pbuff, CDC_RNDIS_PACKET_MSG_SIZE_MAX);
+}
+
+
+/**
+  * @brief  USBD_CDC_RNDIS_SetRxBufferEx
+  *         Register the Rx buffer with the number of bytes the class may use in it
+  * @param  pdev: device instance
+  * @param  pbuff: Rx Buffer
+  * @param  buffer_size: Rx Buffer size, at least the size of an RNDIS packet message header
+  * @retval status
+  */
+uint8_t USBD_CDC_RNDIS_SetRxBufferEx(USBD_HandleTypeDef *pdev, uint8_t *pbuff, uint32_t buffer_size)
+{
   USBD_CDC_RNDIS_HandleTypeDef *hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-  if (hcdc == NULL)
+  if ((hcdc == NULL) || (pbuff == NULL) ||
+      (buffer_size < sizeof(USBD_CDC_RNDIS_PacketMsgTypeDef)))
   {
     return (uint8_t)USBD_FAIL;
   }
 
   hcdc->RxBuffer = pbuff;
+  hcdc->RxBufferBase = pbuff;
+  hcdc->RxBufferSize = buffer_size;
 
   return (uint8_t)USBD_OK;
 }
@@ -1010,11 +1070,6 @@ uint8_t USBD_CDC_RNDIS_TransmitPacket(USBD_HandleTypeDef *pdev)
 
   USBD_CDC_RNDIS_PacketMsgTypeDef *PacketMsg;
   USBD_StatusTypeDef ret = USBD_BUSY;
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, ClassId);
-#endif /* USE_USBD_COMPOSITE */
 
   if (hcdc == NULL)
   {
@@ -1042,10 +1097,10 @@ uint8_t USBD_CDC_RNDIS_TransmitPacket(USBD_HandleTypeDef *pdev)
     PacketMsg->Reserved = 0U;
 
     /* Update the packet total length */
-    pdev->ep_in[RNDISInEpAdd & 0xFU].total_length = hcdc->TxLength;
+    pdev->ep_in[hcdc->in_ep & 0xFU].total_length = hcdc->TxLength;
 
     /* Transmit next packet */
-    (void)USBD_LL_Transmit(pdev, RNDISInEpAdd, hcdc->TxBuffer, hcdc->TxLength);
+    (void)USBD_LL_Transmit(pdev, hcdc->in_ep,  hcdc->TxBuffer, hcdc->TxLength);
 
     ret = USBD_OK;
   }
@@ -1064,11 +1119,6 @@ uint8_t USBD_CDC_RNDIS_ReceivePacket(USBD_HandleTypeDef *pdev)
 {
   USBD_CDC_RNDIS_HandleTypeDef *hcdc;
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (pdev->pClassDataCmsit[pdev->classId] == NULL)
   {
     return (uint8_t)USBD_FAIL;
@@ -1076,11 +1126,33 @@ uint8_t USBD_CDC_RNDIS_ReceivePacket(USBD_HandleTypeDef *pdev)
 
   hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-  /* Prepare Out endpoint to receive next packet */
-  (void)USBD_LL_PrepareReceive(pdev, RNDISOutEpAdd,
-                               hcdc->RxBuffer, hcdc->MaxPcktLen);
+  /* A new message starts at the origin of the registered buffer */
+  hcdc->RxAssembled = 0U;
+  hcdc->RxBuffer = hcdc->RxBufferBase;
 
-  return (uint8_t)USBD_OK;
+  return USBD_CDC_RNDIS_PrepareReceive(pdev, hcdc);
+}
+
+static uint8_t USBD_CDC_RNDIS_PrepareReceive(USBD_HandleTypeDef *pdev,
+                                             USBD_CDC_RNDIS_HandleTypeDef *hcdc)
+{
+  uint8_t *pbuff;
+
+  /* Receive in the registered buffer while a whole packet fits in what is left of it. Otherwise receive in
+     RxPacketBuffer: the controller can deliver a full packet whatever length is requested, and DataOut copies
+     the packet to the registered buffer only if it fits. */
+  if ((hcdc->RxBufferSize - hcdc->RxAssembled) >= hcdc->MaxPcktLen)
+  {
+    pbuff = hcdc->RxBufferBase + hcdc->RxAssembled;
+    hcdc->RxStaged = 0U;
+  }
+  else
+  {
+    pbuff = (uint8_t *)hcdc->RxPacketBuffer;
+    hcdc->RxStaged = 1U;
+  }
+
+  return (uint8_t)USBD_LL_PrepareReceive(pdev, hcdc->out_ep, pbuff, hcdc->MaxPcktLen);
 }
 
 
@@ -1110,11 +1182,6 @@ uint8_t USBD_CDC_RNDIS_SendNotification(USBD_HandleTypeDef *pdev,
     return (uint8_t)USBD_FAIL;
   }
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  RNDISCmdEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   /* Initialize the request fields */
   (hcdc->Req).bmRequest = CDC_RNDIS_BMREQUEST_TYPE_RNDIS;
   (hcdc->Req).bRequest = (uint8_t)Notif;
@@ -1142,7 +1209,7 @@ uint8_t USBD_CDC_RNDIS_SendNotification(USBD_HandleTypeDef *pdev,
   /* Transmit notification packet */
   if (ReqSize != 0U)
   {
-    (void)USBD_LL_Transmit(pdev, RNDISCmdEpAdd, (uint8_t *)&hcdc->Req, ReqSize);
+    (void)USBD_LL_Transmit(pdev, hcdc->cmd_ep, (uint8_t *)&hcdc->Req, ReqSize);
   }
 
   return (uint8_t)ret;
@@ -1252,7 +1319,7 @@ static uint8_t USBD_CDC_RNDIS_ProcessInitMsg(USBD_HandleTypeDef *pdev,
   InitResponse->DeviceFlags = CDC_RNDIS_DF_CONNECTIONLESS;
   InitResponse->Medium = CDC_RNDIS_MEDIUM_802_3;
   InitResponse->MaxPacketsPerTransfer = 1U;
-  InitResponse->MaxTransferSize = (sizeof(USBD_CDC_RNDIS_PacketMsgTypeDef) + CDC_RNDIS_ETH_FRAME_SIZE_MAX);
+  InitResponse->MaxTransferSize = CDC_RNDIS_PACKET_MSG_SIZE_MAX;
   InitResponse->PacketAlignmentFactor = 2U; /* Not needed as single packet by transfer set */
   InitResponse->AFListOffset = 0U; /* Reserved for connection-oriented devices. Set value to zero. */
   InitResponse->AFListSize = 0U; /* Reserved for connection-oriented devices. Set value to zero. */
@@ -1614,42 +1681,46 @@ static uint8_t USBD_CDC_RNDIS_ProcessResetMsg(USBD_HandleTypeDef *pdev,
   * @retval status
   */
 static uint8_t USBD_CDC_RNDIS_ProcessPacketMsg(USBD_HandleTypeDef *pdev,
-                                               USBD_CDC_RNDIS_PacketMsgTypeDef *Msg)
+                                               uint8_t *buffer, uint32_t received_length)
 {
-  uint32_t tmp1;
-  uint32_t tmp2;
-
-  /* Get the CDC_RNDIS handle pointer */
   USBD_CDC_RNDIS_HandleTypeDef *hcdc = (USBD_CDC_RNDIS_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_CDC_RNDIS_PacketMsgTypeDef packet_msg;
+  uint32_t data_start;
+  uint32_t payload_length;
 
-  /* Get and format the Msg input */
-  USBD_CDC_RNDIS_PacketMsgTypeDef *PacketMsg = (USBD_CDC_RNDIS_PacketMsgTypeDef *)Msg;
-
-  if (hcdc == NULL)
+  if ((hcdc == NULL) || (buffer == NULL) ||
+      (received_length < sizeof(packet_msg)) ||
+      (received_length > hcdc->RxBufferSize))
   {
     return (uint8_t)USBD_FAIL;
   }
+
+  /* Copy the fixed header so the caller buffer need not have word alignment. */
+  (void)USBD_memcpy(&packet_msg, buffer, sizeof(packet_msg));
 
   /* Check correctness of the message */
-  if ((PacketMsg->MsgType != CDC_RNDIS_PACKET_MSG_ID))
+  if ((packet_msg.MsgType != CDC_RNDIS_PACKET_MSG_ID) ||
+      (packet_msg.MsgLength < sizeof(packet_msg)) ||
+      (packet_msg.MsgLength > received_length) ||
+      (packet_msg.DataOffset > (packet_msg.MsgLength - CDC_RNDIS_PCKTMSG_DATAOFFSET_OFFSET)))
   {
     return (uint8_t)USBD_FAIL;
   }
 
-  /* Point to the payload and update the message length */
+  data_start = CDC_RNDIS_PCKTMSG_DATAOFFSET_OFFSET + packet_msg.DataOffset;
+  payload_length = packet_msg.DataLength;
 
-  /* Use temporary storage variables to comply with MISRA-C 2012 rule of (+) operand allowed types */
-  tmp1 = (uint32_t)PacketMsg;
-  tmp2 = (uint32_t)(PacketMsg->DataOffset);
-
-  /* Validate DataOffset and DataLength against the received MsgLength */
-  if ((tmp2 + CDC_RNDIS_PCKTMSG_DATAOFFSET_OFFSET + PacketMsg->DataLength) > PacketMsg->MsgLength)
+  /* Validate the payload span against both the declared message and actual bytes received. */
+  if ((data_start < sizeof(packet_msg)) ||
+      (payload_length > (packet_msg.MsgLength - data_start)) ||
+      (data_start > received_length) ||
+      (payload_length > (received_length - data_start)))
   {
     return (uint8_t)USBD_FAIL;
   }
 
-  hcdc->RxBuffer = (uint8_t *)(tmp1 + tmp2 + CDC_RNDIS_PCKTMSG_DATAOFFSET_OFFSET);
-  hcdc->RxLength = PacketMsg->DataLength;
+  hcdc->RxBuffer = buffer + data_start;
+  hcdc->RxLength = payload_length;
 
   /* Process data by application */
   ((USBD_CDC_RNDIS_ItfTypeDef *)pdev->pUserData[pdev->classId])->Receive(hcdc->RxBuffer, &hcdc->RxLength);

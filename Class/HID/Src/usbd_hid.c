@@ -262,8 +262,6 @@ __ALIGN_BEGIN static uint8_t HID_MOUSE_ReportDesc[HID_MOUSE_REPORT_DESC_SIZE] __
   0xC0               /* End Collection                         */
 };
 
-static uint8_t HIDInEpAdd = HID_EPIN_ADDR;
-
 /**
   * @}
   */
@@ -296,23 +294,25 @@ static uint8_t USBD_HID_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
   pdev->pClassDataCmsit[pdev->classId] = (void *)hhid;
   pdev->pClassData = pdev->pClassDataCmsit[pdev->classId];
 
+  hhid->in_ep = HID_EPIN_ADDR;
+
 #ifdef USE_USBD_COMPOSITE
   /* Get the Endpoints addresses allocated for this class instance */
-  HIDInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
+  hhid->in_ep = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
 #endif /* USE_USBD_COMPOSITE */
 
   if (pdev->dev_speed == USBD_SPEED_HIGH)
   {
-    pdev->ep_in[HIDInEpAdd & 0xFU].bInterval = HID_HS_BINTERVAL;
+    pdev->ep_in[hhid->in_ep & 0xFU].bInterval = HID_HS_BINTERVAL;
   }
   else   /* LOW and FULL-speed endpoints */
   {
-    pdev->ep_in[HIDInEpAdd & 0xFU].bInterval = HID_FS_BINTERVAL;
+    pdev->ep_in[hhid->in_ep & 0xFU].bInterval = HID_FS_BINTERVAL;
   }
 
   /* Open EP IN */
-  (void)USBD_LL_OpenEP(pdev, HIDInEpAdd, USBD_EP_TYPE_INTR, HID_EPIN_SIZE);
-  pdev->ep_in[HIDInEpAdd & 0xFU].is_used = 1U;
+  (void)USBD_LL_OpenEP(pdev, hhid->in_ep, USBD_EP_TYPE_INTR, HID_EPIN_SIZE);
+  pdev->ep_in[hhid->in_ep & 0xFU].is_used = 1U;
 
   hhid->state = USBD_HID_IDLE;
 
@@ -330,19 +330,16 @@ static uint8_t USBD_HID_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
   UNUSED(cfgidx);
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  HIDInEpAdd  = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
-  /* Close HID EPs */
-  (void)USBD_LL_CloseEP(pdev, HIDInEpAdd);
-  pdev->ep_in[HIDInEpAdd & 0xFU].is_used = 0U;
-  pdev->ep_in[HIDInEpAdd & 0xFU].bInterval = 0U;
+  USBD_HID_HandleTypeDef *hhid = (USBD_HID_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
   /* Free allocated memory */
-  if (pdev->pClassDataCmsit[pdev->classId] != NULL)
+  if (hhid != NULL)
   {
+    /* Close HID EPs */
+    (void)USBD_LL_CloseEP(pdev, hhid->in_ep);
+    pdev->ep_in[hhid->in_ep & 0xFU].is_used = 0U;
+    pdev->ep_in[hhid->in_ep & 0xFU].bInterval = 0U;
+
     (void)USBD_free(pdev->pClassDataCmsit[pdev->classId]);
     pdev->pClassDataCmsit[pdev->classId] = NULL;
   }
@@ -365,8 +362,11 @@ static uint8_t USBD_HID_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
   uint8_t *pbuf;
   uint16_t status_info = 0U;
 
-  if (hhid == NULL)
+  if ((hhid == NULL) &&
+      (((req->bmRequest & USB_REQ_TYPE_MASK) != USB_REQ_TYPE_STANDARD) ||
+       (req->bRequest != USB_REQ_GET_DESCRIPTOR)))
   {
+    USBD_CtlError(pdev, req);
     return (uint8_t)USBD_FAIL;
   }
 
@@ -499,17 +499,12 @@ uint8_t USBD_HID_SendReport(USBD_HandleTypeDef *pdev, uint8_t *report, uint16_t 
     return (uint8_t)USBD_FAIL;
   }
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  HIDInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_INTR, ClassId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (pdev->dev_state == USBD_STATE_CONFIGURED)
   {
     if (hhid->state == USBD_HID_IDLE)
     {
       hhid->state = USBD_HID_BUSY;
-      (void)USBD_LL_Transmit(pdev, HIDInEpAdd, report, len);
+      (void)USBD_LL_Transmit(pdev, hhid->in_ep, report, len);
     }
   }
 
@@ -655,4 +650,3 @@ static uint8_t *USBD_HID_GetDeviceQualifierDesc(uint16_t *length)
 /**
   * @}
   */
-

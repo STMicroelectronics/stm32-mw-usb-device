@@ -122,6 +122,7 @@ extern "C" {
 #define MTP_RESPONSE_SESSION_ALREADY_OPEN                           0x201EU
 #define MTP_RESPONSE_TRANSACTION_CANCELLED                          0x201FU
 #define MTP_RESPONSE_INVALID_OBJECT_PROP_CODE                       0xA801U
+#define MTP_RESPONSE_INVALID_DATASET                                0xA806U
 #define MTP_RESPONSE_SPECIFICATION_BY_GROUP_UNSUPPORTED             0xA807U
 #define MTP_RESPONSE_OBJECT_PROP_NOT_SUPPORTED                      0xA80AU
 
@@ -279,11 +280,15 @@ typedef struct
   uint32_t                     ResponseLength;
   uint32_t                     ResponseCode;
   __IO uint16_t                MaxPcktLen;
+  uint8_t                      in_ep;                                        /* Bulk IN endpoint address */
+  uint8_t                      out_ep;                                       /* Bulk OUT endpoint address */
+  uint8_t                      cmd_ep;                                       /* Interrupt IN endpoint address */
   uint32_t                     rx_buff[MTP_MEDIA_PACKET / 4U];               /* Force 32-bit alignment */
   MTP_ResponsePhaseTypeDef     MTP_ResponsePhase;
   MTP_SessionStateTypeDef      MTP_SessionState;
   MTP_RECEIVE_DATA_STATUS      RECEIVE_DATA_STATUS;
   MTP_OperationsTypeDef        OperationsContainer;
+  uint32_t                     active_transaction_id;
   MTP_GenericContainerTypeDef  GenericContainer;
 } USBD_MTP_HandleTypeDef;
 

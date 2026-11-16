@@ -156,6 +156,7 @@ static int8_t TEMPLATE_Receive(uint8_t *Buf, uint32_t *Len)
 static int8_t TEMPLATE_Control_req(uint8_t req, uint8_t *pbuf, uint16_t *length)
 {
   uint32_t i = 0U;
+  uint32_t capacity = *length; /* On entry, length holds the capacity of pbuf */
 
   /* Check on the setup request value */
   switch (req)
@@ -163,7 +164,7 @@ static int8_t TEMPLATE_Control_req(uint8_t req, uint8_t *pbuf, uint16_t *length)
     /* Get Printer Device ID request */
     case PRNT_GET_DEVICE_ID:
       /* Not using for loop here due to MISRA-C2012-Rule-16.1 */
-      while (i < sizeof(PRNT_DEVICE_ID))
+      while ((i < sizeof(PRNT_DEVICE_ID)) && (i < capacity))
       {
         pbuf[i] = PRNT_DEVICE_ID[i];
         i++;
@@ -173,11 +174,18 @@ static int8_t TEMPLATE_Control_req(uint8_t req, uint8_t *pbuf, uint16_t *length)
 
     /* Get Printer current status */
     case PRNT_GET_PORT_STATUS:
-      pbuf[0] =  PRNT_STATUS_PAPER_EMPTY |
-                 PRNT_STATUS_SELECTED |
-                 PRNT_STATUS_NO_ERROR;
+      if (capacity >= 1U)
+      {
+        pbuf[0] =  PRNT_STATUS_PAPER_EMPTY |
+                   PRNT_STATUS_SELECTED |
+                   PRNT_STATUS_NO_ERROR;
 
-      *length = 1U;
+        *length = 1U;
+      }
+      else
+      {
+        *length = 0U;
+      }
       break;
 
     /* Printer SOFT RESET request: cleanup pending tasks */

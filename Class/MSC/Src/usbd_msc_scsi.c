@@ -67,8 +67,6 @@ EndBSPDependencies */
 /** @defgroup MSC_SCSI_Private_Variables
   * @{
   */
-extern uint8_t MSCInEpAdd;
-extern uint8_t MSCOutEpAdd;
 /**
   * @}
   */
@@ -100,6 +98,8 @@ static int8_t SCSI_ReportLuns(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *pa
 static int8_t SCSI_ReceiveDiagnosticResults(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params);
 static int8_t SCSI_CheckAddressRange(USBD_HandleTypeDef *pdev, uint8_t lun,
                                      uint32_t blk_offset, uint32_t blk_nbr);
+static int8_t SCSI_GetTransferLength(USBD_HandleTypeDef *pdev, uint8_t lun, uint32_t *length);
+static uint32_t SCSI_GetChunkBlocks(const USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk);
 
 static int8_t SCSI_ProcessRead(USBD_HandleTypeDef *pdev, uint8_t lun);
 static int8_t SCSI_ProcessWrite(USBD_HandleTypeDef *pdev, uint8_t lun);
@@ -210,6 +210,21 @@ int8_t SCSI_ProcessCmd(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *cmd)
 
     case SCSI_RECEIVE_DIAGNOSTIC_RESULTS:
       ret = SCSI_ReceiveDiagnosticResults(pdev, lun, cmd);
+      break;
+
+    case SCSI_SYNCHRONIZE_CACHE10:
+      if (hmsc->cbw.dDataLength != 0U)
+      {
+        SCSI_SenseCode(pdev, lun, ILLEGAL_REQUEST, INVALID_CDB);
+        ret = -1;
+      }
+      else
+      {
+        /* No cache-flush hook is available; treat this as a no-op for uncached media. */
+        hmsc->bot_data_length = 0U;
+        hmsc->bot_state = USBD_BOT_NO_DATA;
+        ret = 0;
+      }
       break;
 
     default:
@@ -510,11 +525,6 @@ static int8_t SCSI_ProcessModeSelect(USBD_HandleTypeDef *pdev, uint8_t lun,
 
   p_scsi_blk = &hmsc->scsi_blk[lun];
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-
   if (hmsc->bot_state == USBD_BOT_IDLE)
   {
     if ((hmsc->cbw.bmFlags & 0x80U) == 0x80U)
@@ -534,12 +544,12 @@ static int8_t SCSI_ProcessModeSelect(USBD_HandleTypeDef *pdev, uint8_t lun,
     hmsc->bot_state = USBD_BOT_DATA_OUT;
 
     packet_length = MIN(p_scsi_blk->len, MSC_MEDIA_PACKET);
-    (void)USBD_LL_PrepareReceive(pdev, MSCOutEpAdd, hmsc->bot_data, packet_length);
+    (void)USBD_LL_PrepareReceive(pdev, hmsc->out_ep, hmsc->bot_data, packet_length);
 
     return 0;
   }
 
-  rx_length = USBD_LL_GetRxDataSize(pdev, MSCOutEpAdd);
+  rx_length = USBD_LL_GetRxDataSize(pdev, hmsc->out_ep);
 
   if (rx_length >= p_scsi_blk->len)
   {
@@ -552,7 +562,7 @@ static int8_t SCSI_ProcessModeSelect(USBD_HandleTypeDef *pdev, uint8_t lun,
     p_scsi_blk->len -= rx_length;
     hmsc->csw.dDataResidue -= rx_length;
     packet_length = MIN(p_scsi_blk->len, MSC_MEDIA_PACKET);
-    (void)USBD_LL_PrepareReceive(pdev, MSCOutEpAdd, hmsc->bot_data, packet_length);
+    (void)USBD_LL_PrepareReceive(pdev, hmsc->out_ep, hmsc->bot_data, packet_length);
   }
 
   return 0;
@@ -855,6 +865,7 @@ static int8_t SCSI_Read10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params
 {
   USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk;
+  uint32_t len;
 
   if (hmsc == NULL)
   {
@@ -897,11 +908,23 @@ static int8_t SCSI_Read10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params
       return -1; /* error */
     }
 
+    if (SCSI_GetTransferLength(pdev, lun, &len) < 0)
+    {
+      return -1; /* error */
+    }
+
     /* cases 4,5 : Hi <> Dn */
-    if (hmsc->cbw.dDataLength != (p_scsi_blk->len * p_scsi_blk->size))
+    if (hmsc->cbw.dDataLength != len)
     {
       SCSI_SenseCode(pdev, hmsc->cbw.bLUN, ILLEGAL_REQUEST, INVALID_CDB);
       return -1;
+    }
+
+    /* No block to read: there is no data stage, the command is complete */
+    if (p_scsi_blk->len == 0U)
+    {
+      hmsc->bot_data_length = 0U;
+      return 0;
     }
 
     hmsc->bot_state = USBD_BOT_DATA_IN;
@@ -923,6 +946,7 @@ static int8_t SCSI_Read12(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params
 {
   USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk;
+  uint32_t len;
 
   if (hmsc == NULL)
   {
@@ -967,11 +991,23 @@ static int8_t SCSI_Read12(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *params
       return -1; /* error */
     }
 
+    if (SCSI_GetTransferLength(pdev, lun, &len) < 0)
+    {
+      return -1; /* error */
+    }
+
     /* cases 4,5 : Hi <> Dn */
-    if (hmsc->cbw.dDataLength != (p_scsi_blk->len * p_scsi_blk->size))
+    if (hmsc->cbw.dDataLength != len)
     {
       SCSI_SenseCode(pdev, hmsc->cbw.bLUN, ILLEGAL_REQUEST, INVALID_CDB);
       return -1;
+    }
+
+    /* No block to read: there is no data stage, the command is complete */
+    if (p_scsi_blk->len == 0U)
+    {
+      hmsc->bot_data_length = 0U;
+      return 0;
     }
 
     hmsc->bot_state = USBD_BOT_DATA_IN;
@@ -1001,11 +1037,6 @@ static int8_t SCSI_Write10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *param
   }
 
   p_scsi_blk = &hmsc->scsi_blk[lun];
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
 
   if (hmsc->bot_state == USBD_BOT_IDLE) /* Idle */
   {
@@ -1059,7 +1090,10 @@ static int8_t SCSI_Write10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *param
       return -1; /* error */
     }
 
-    len = p_scsi_blk->len * p_scsi_blk->size;
+    if (SCSI_GetTransferLength(pdev, lun, &len) < 0)
+    {
+      return -1; /* error */
+    }
 
     /* cases 3,11,13 : Hn,Ho <> D0 */
     if (hmsc->cbw.dDataLength != len)
@@ -1068,11 +1102,11 @@ static int8_t SCSI_Write10(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *param
       return -1;
     }
 
-    len = MIN(len, MSC_MEDIA_PACKET);
+    len = SCSI_GetChunkBlocks(p_scsi_blk) * p_scsi_blk->size;
 
     /* Prepare EP to receive first data packet */
     hmsc->bot_state = USBD_BOT_DATA_OUT;
-    (void)USBD_LL_PrepareReceive(pdev, MSCOutEpAdd, hmsc->bot_data, len);
+    (void)USBD_LL_PrepareReceive(pdev, hmsc->out_ep, hmsc->bot_data, len);
   }
   else /* Write Process ongoing */
   {
@@ -1102,11 +1136,6 @@ static int8_t SCSI_Write12(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *param
   }
 
   p_scsi_blk = &hmsc->scsi_blk[lun];
-
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
 
   if (hmsc->bot_state == USBD_BOT_IDLE) /* Idle */
   {
@@ -1162,7 +1191,10 @@ static int8_t SCSI_Write12(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *param
       return -1; /* error */
     }
 
-    len = p_scsi_blk->len * p_scsi_blk->size;
+    if (SCSI_GetTransferLength(pdev, lun, &len) < 0)
+    {
+      return -1; /* error */
+    }
 
     /* cases 3,11,13 : Hn,Ho <> D0 */
     if (hmsc->cbw.dDataLength != len)
@@ -1171,11 +1203,11 @@ static int8_t SCSI_Write12(USBD_HandleTypeDef *pdev, uint8_t lun, uint8_t *param
       return -1;
     }
 
-    len = MIN(len, MSC_MEDIA_PACKET);
+    len = SCSI_GetChunkBlocks(p_scsi_blk) * p_scsi_blk->size;
 
     /* Prepare EP to receive first data packet */
     hmsc->bot_state = USBD_BOT_DATA_OUT;
-    (void)USBD_LL_PrepareReceive(pdev, MSCOutEpAdd, hmsc->bot_data, len);
+    (void)USBD_LL_PrepareReceive(pdev, hmsc->out_ep, hmsc->bot_data, len);
   }
   else /* Write Process ongoing */
   {
@@ -1368,6 +1400,7 @@ static int8_t SCSI_CheckAddressRange(USBD_HandleTypeDef *pdev, uint8_t lun,
 {
   USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk;
+  int8_t ret;
 
   if (hmsc == NULL)
   {
@@ -1378,14 +1411,74 @@ static int8_t SCSI_CheckAddressRange(USBD_HandleTypeDef *pdev, uint8_t lun,
 
   /* Refresh cached capacity for this LUN so multi-LUN configs
      with different sizes use the correct block count. */
-  (void)((USBD_StorageTypeDef *)pdev->pUserData[pdev->classId])->GetCapacity(lun, &p_scsi_blk->nbr,
+  ret = ((USBD_StorageTypeDef *)pdev->pUserData[pdev->classId])->GetCapacity(lun, &p_scsi_blk->nbr,
                                                                              &p_scsi_blk->size);
+
+  if (ret != 0)
+  {
+    SCSI_SenseCode(pdev, lun, NOT_READY, MEDIUM_NOT_PRESENT);
+    return -1;
+  }
 
   if ((blk_nbr > p_scsi_blk->nbr) || (blk_offset > (p_scsi_blk->nbr - blk_nbr)))
   {
     SCSI_SenseCode(pdev, lun, ILLEGAL_REQUEST, ADDRESS_OUT_OF_RANGE);
     return -1;
   }
+
+  return 0;
+}
+
+/**
+  * @brief  SCSI_GetChunkBlocks
+  *         Number of blocks of the next transfer on the bulk endpoints
+  *         Each transfer moves whole blocks and at most the data buffer, so a transfer always makes progress
+  * @param  p_scsi_blk: LUN transfer context
+  * @retval number of blocks, 0 if the transfer is complete or the block size is not usable
+  */
+static uint32_t SCSI_GetChunkBlocks(const USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk)
+{
+  uint32_t blocks = 0U;
+
+  if ((p_scsi_blk->size != 0U) && (p_scsi_blk->size <= MSC_MEDIA_PACKET))
+  {
+    /* The storage interface counts the blocks of a transfer on 16 bits */
+    blocks = MIN((uint32_t)MSC_MEDIA_PACKET / (uint32_t)p_scsi_blk->size, 0xFFFFU);
+    blocks = MIN(blocks, p_scsi_blk->len);
+  }
+
+  return blocks;
+}
+
+/**
+  * @brief  SCSI_GetTransferLength
+  *         Number of bytes of the READ/WRITE command being decoded
+  *         The block count comes from the host and the block size from the application: the transfer must fit
+  *         the 32-bit data length of a CBW, and a block must fit the data buffer, or it cannot be performed
+  * @param  lun: Logical unit number
+  * @param  length: number of bytes of the transfer
+  * @retval status
+  */
+static int8_t SCSI_GetTransferLength(USBD_HandleTypeDef *pdev, uint8_t lun, uint32_t *length)
+{
+  USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+  USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk;
+
+  if (hmsc == NULL)
+  {
+    return -1;
+  }
+
+  p_scsi_blk = &hmsc->scsi_blk[lun];
+
+  if ((p_scsi_blk->size == 0U) || (p_scsi_blk->size > MSC_MEDIA_PACKET) ||
+      (p_scsi_blk->len > (0xFFFFFFFFU / (uint32_t)p_scsi_blk->size)))
+  {
+    SCSI_SenseCode(pdev, lun, ILLEGAL_REQUEST, INVALID_CDB);
+    return -1;
+  }
+
+  *length = p_scsi_blk->len * (uint32_t)p_scsi_blk->size;
 
   return 0;
 }
@@ -1400,6 +1493,7 @@ static int8_t SCSI_ProcessRead(USBD_HandleTypeDef *pdev, uint8_t lun)
 {
   USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk;
+  uint32_t blocks;
   uint32_t len;
 
   if (hmsc == NULL)
@@ -1409,27 +1503,29 @@ static int8_t SCSI_ProcessRead(USBD_HandleTypeDef *pdev, uint8_t lun)
 
   p_scsi_blk = &hmsc->scsi_blk[lun];
 
-  len = p_scsi_blk->len * p_scsi_blk->size;
+  blocks = SCSI_GetChunkBlocks(p_scsi_blk);
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  /* Not reached for a command accepted by SCSI_GetTransferLength; it keeps every transfer progressing */
+  if (blocks == 0U)
+  {
+    SCSI_SenseCode(pdev, lun, ILLEGAL_REQUEST, INVALID_CDB);
+    return -1;
+  }
 
-  len = MIN(len, MSC_MEDIA_PACKET);
+  len = blocks * (uint32_t)p_scsi_blk->size;
 
   if (((USBD_StorageTypeDef *)pdev->pUserData[pdev->classId])->Read(lun, hmsc->bot_data,
                                                                     p_scsi_blk->addr,
-                                                                    (len / p_scsi_blk->size)) < 0)
+                                                                    (uint16_t)blocks) < 0)
   {
     SCSI_SenseCode(pdev, lun, HARDWARE_ERROR, UNRECOVERED_READ_ERROR);
     return -1;
   }
 
-  (void)USBD_LL_Transmit(pdev, MSCInEpAdd, hmsc->bot_data, len);
+  (void)USBD_LL_Transmit(pdev, hmsc->in_ep, hmsc->bot_data, len);
 
-  p_scsi_blk->addr += (len / p_scsi_blk->size);
-  p_scsi_blk->len -= (len / p_scsi_blk->size);
+  p_scsi_blk->addr += blocks;
+  p_scsi_blk->len -= blocks;
 
   /* case 6 : Hi = Di */
   hmsc->csw.dDataResidue -= len;
@@ -1452,6 +1548,7 @@ static int8_t SCSI_ProcessWrite(USBD_HandleTypeDef *pdev, uint8_t lun)
 {
   USBD_MSC_BOT_HandleTypeDef *hmsc = (USBD_MSC_BOT_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MSC_BOT_LUN_TypeDef *p_scsi_blk;
+  uint32_t blocks;
   uint32_t len;
 
   if (hmsc == NULL)
@@ -1461,24 +1558,26 @@ static int8_t SCSI_ProcessWrite(USBD_HandleTypeDef *pdev, uint8_t lun)
 
   p_scsi_blk = &hmsc->scsi_blk[lun];
 
-  len = p_scsi_blk->len * p_scsi_blk->size;
+  blocks = SCSI_GetChunkBlocks(p_scsi_blk);
 
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MSCOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  /* Not reached for a command accepted by SCSI_GetTransferLength; it keeps every transfer progressing */
+  if (blocks == 0U)
+  {
+    SCSI_SenseCode(pdev, lun, ILLEGAL_REQUEST, INVALID_CDB);
+    return -1;
+  }
 
-  len = MIN(len, MSC_MEDIA_PACKET);
+  len = blocks * (uint32_t)p_scsi_blk->size;
 
   if (((USBD_StorageTypeDef *)pdev->pUserData[pdev->classId])->Write(lun, hmsc->bot_data, p_scsi_blk->addr,
-                                                                     (len / p_scsi_blk->size)) < 0)
+                                                                     (uint16_t)blocks) < 0)
   {
     SCSI_SenseCode(pdev, lun, HARDWARE_ERROR, WRITE_FAULT);
     return -1;
   }
 
-  p_scsi_blk->addr += (len / p_scsi_blk->size);
-  p_scsi_blk->len -= (len / p_scsi_blk->size);
+  p_scsi_blk->addr += blocks;
+  p_scsi_blk->len -= blocks;
 
   /* case 12 : Ho = Do */
   hmsc->csw.dDataResidue -= len;
@@ -1489,10 +1588,10 @@ static int8_t SCSI_ProcessWrite(USBD_HandleTypeDef *pdev, uint8_t lun)
   }
   else
   {
-    len = MIN((p_scsi_blk->len * p_scsi_blk->size), MSC_MEDIA_PACKET);
+    len = SCSI_GetChunkBlocks(p_scsi_blk) * (uint32_t)p_scsi_blk->size;
 
     /* Prepare EP to Receive next packet */
-    (void)USBD_LL_PrepareReceive(pdev, MSCOutEpAdd, hmsc->bot_data, len);
+    (void)USBD_LL_PrepareReceive(pdev, hmsc->out_ep, hmsc->bot_data, len);
   }
 
   return 0;
@@ -1540,4 +1639,3 @@ static int8_t SCSI_UpdateBotData(USBD_MSC_BOT_HandleTypeDef *hmsc,
 /**
   * @}
   */
-

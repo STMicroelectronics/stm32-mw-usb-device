@@ -22,8 +22,6 @@
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
-extern uint8_t MTPInEpAdd;
-extern uint8_t MTPOutEpAdd;
 
 /* Private variables ---------------------------------------------------------*/
 static MTP_DataLengthTypeDef MTP_DataLength;
@@ -48,16 +46,12 @@ static uint8_t USBD_MTP_STORAGE_SendData(USBD_HandleTypeDef  *pdev, uint8_t *buf
 uint8_t USBD_MTP_STORAGE_Init(USBD_HandleTypeDef  *pdev)
 {
   USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
 
   /* Initialize the HW layyer of the file system */
   (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])->Init();
 
   /* Prepare EP to Receive First Operation */
-  (void)USBD_LL_PrepareReceive(pdev, MTPOutEpAdd, (uint8_t *)&hmtp->rx_buff,
+  (void)USBD_LL_PrepareReceive(pdev, hmtp->out_ep, (uint8_t *)&hmtp->rx_buff,
                                hmtp->MaxPcktLen);
 
   return (uint8_t)USBD_OK;
@@ -238,11 +232,13 @@ uint8_t USBD_MTP_STORAGE_ReceiveOpt(USBD_HandleTypeDef  *pdev)
 {
   USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint32_t *pMsgBuffer;
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MTPOutEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_OUT, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
-  MTP_DataLength.rx_length = USBD_GetRxCount(pdev, MTPOutEpAdd);
+
+  if (hmtp == NULL)
+  {
+    return (uint8_t)USBD_EMEM;
+  }
+
+  MTP_DataLength.rx_length = USBD_GetRxCount(pdev, hmtp->out_ep);
 
   switch (hmtp->RECEIVE_DATA_STATUS)
   {
@@ -251,19 +247,52 @@ uint8_t USBD_MTP_STORAGE_ReceiveOpt(USBD_HandleTypeDef  *pdev)
       break;
 
     case RECEIVE_FIRST_DATA:
+      if (MTP_DataLength.rx_length < MTP_CONT_HEADER_SIZE)
+      {
+        USBD_ErrLog("MTP: truncated DATA container header");
+        return (uint8_t)USBD_FAIL;
+      }
+
       /* Expected Data Length Packet Received */
       pMsgBuffer = (uint32_t *) &hmtp->OperationsContainer;
 
       /* Fill hmtp->OperationsContainer Data Buffer from USB Buffer */
-      (void)USBD_MTP_STORAGE_ReceiveContainer(pdev, pMsgBuffer, MTP_DataLength.rx_length);
+      if (USBD_MTP_STORAGE_ReceiveContainer(pdev, pMsgBuffer, MTP_DataLength.rx_length) != (uint8_t)USBD_OK)
+      {
+        return (uint8_t)USBD_FAIL;
+      }
+
+      if ((hmtp->OperationsContainer.length < MTP_CONT_HEADER_SIZE) ||
+          (MTP_DataLength.rx_length > hmtp->OperationsContainer.length))
+      {
+        USBD_ErrLog("MTP: invalid DATA container length");
+        return (uint8_t)USBD_FAIL;
+      }
       break;
 
     default:
+      if (MTP_DataLength.rx_length < MTP_CONT_HEADER_SIZE)
+      {
+        USBD_ErrLog("MTP: truncated operation container header");
+        return (uint8_t)USBD_FAIL;
+      }
+
       /* Expected Data Length Packet Received */
       pMsgBuffer = (uint32_t *) &hmtp->OperationsContainer;
 
       /* Fill hmtp->OperationsContainer Data Buffer from USB Buffer */
-      (void)USBD_MTP_STORAGE_ReceiveContainer(pdev, pMsgBuffer, MTP_DataLength.rx_length);
+      if (USBD_MTP_STORAGE_ReceiveContainer(pdev, pMsgBuffer, MTP_DataLength.rx_length) != (uint8_t)USBD_OK)
+      {
+        return (uint8_t)USBD_FAIL;
+      }
+
+      /* Every command opens a transaction: its ID is the one the DATA container and the response must carry.
+         MTP_ResponsePhase is not used here, it keeps its last value after an OUT transaction completes. */
+      if (hmtp->OperationsContainer.type == MTP_CONT_TYPE_COMMAND)
+      {
+        hmtp->active_transaction_id = hmtp->OperationsContainer.trans_id;
+      }
+
       (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
       break;
 
@@ -281,6 +310,12 @@ uint8_t USBD_MTP_STORAGE_ReceiveOpt(USBD_HandleTypeDef  *pdev)
 uint8_t USBD_MTP_STORAGE_ReceiveData(USBD_HandleTypeDef  *pdev)
 {
   USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+
+  if (hmtp == NULL)
+  {
+    return (uint8_t)USBD_EMEM;
+  }
+
   switch (hmtp->RECEIVE_DATA_STATUS)
   {
     case RECEIVE_COMMAND_DATA :
@@ -294,31 +329,90 @@ uint8_t USBD_MTP_STORAGE_ReceiveData(USBD_HandleTypeDef  *pdev)
       break;
 
     case RECEIVE_FIRST_DATA :
-      if (hmtp->OperationsContainer.type == MTP_CONT_TYPE_DATA)
+      if ((hmtp->OperationsContainer.type != MTP_CONT_TYPE_DATA) ||
+          (MTP_DataLength.rx_length < MTP_CONT_HEADER_SIZE) ||
+          (hmtp->OperationsContainer.length < MTP_CONT_HEADER_SIZE) ||
+          (MTP_DataLength.rx_length > hmtp->OperationsContainer.length) ||
+          (hmtp->OperationsContainer.trans_id != hmtp->active_transaction_id))
       {
-        MTP_DataLength.totallen = hmtp->OperationsContainer.length;
-        MTP_DataLength.temp_length = MTP_DataLength.rx_length;
-        MTP_DataLength.rx_length = MTP_DataLength.temp_length - MTP_CONT_HEADER_SIZE;
+        USBD_ErrLog("MTP: invalid or truncated DATA container");
+        return (uint8_t)USBD_FAIL;
+      }
+
+      MTP_DataLength.totallen = hmtp->OperationsContainer.length;
+      MTP_DataLength.temp_length = MTP_DataLength.rx_length;
+
+      if ((MTP_DataLength.totallen != 0xFFFFFFFFU) &&
+          (MTP_DataLength.temp_length < hmtp->MaxPcktLen) &&
+          (MTP_DataLength.temp_length != MTP_DataLength.totallen))
+      {
+        USBD_ErrLog("MTP: DATA terminated before the declared container length");
+        return (uint8_t)USBD_FAIL;
+      }
+
+      MTP_DataLength.rx_length = MTP_DataLength.temp_length - MTP_CONT_HEADER_SIZE;
+      (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
+
+      if ((MTP_DataLength.totallen == 0xFFFFFFFFU) &&
+          (MTP_DataLength.temp_length < hmtp->MaxPcktLen))
+      {
+        hmtp->RECEIVE_DATA_STATUS = SEND_RESPONSE;
+        (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
+        (void)USBD_MTP_STORAGE_SendContainer(pdev, DATA_TYPE);
+      }
+      else if (MTP_DataLength.temp_length == MTP_DataLength.totallen)
+      {
+        hmtp->RECEIVE_DATA_STATUS = SEND_RESPONSE;
         (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
 
-        if (MTP_DataLength.temp_length < hmtp->MaxPcktLen) /* we received all data, we don't need to go to next state */
-        {
-          hmtp->RECEIVE_DATA_STATUS = SEND_RESPONSE;
-          (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
-
-          /* send response header after receiving all data successfully */
-          (void)USBD_MTP_STORAGE_SendContainer(pdev, DATA_TYPE);
-        }
+        /* Send the response after receiving the complete declared container. */
+        (void)USBD_MTP_STORAGE_SendContainer(pdev, DATA_TYPE);
       }
 
       break;
 
     case RECEIVE_REST_OF_DATA :
-      MTP_DataLength.prv_len = MTP_DataLength.temp_length - MTP_CONT_HEADER_SIZE;
-      (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
-      MTP_DataLength.temp_length = MTP_DataLength.temp_length + MTP_DataLength.rx_length;
+      /* 0xFFFFFFFF marks an unknown-size PTP data phase, terminated by a short packet or ZLP. */
+      if ((MTP_DataLength.totallen != 0xFFFFFFFFU) &&
+          ((MTP_DataLength.temp_length > MTP_DataLength.totallen) ||
+           (MTP_DataLength.rx_length > (MTP_DataLength.totallen - MTP_DataLength.temp_length))))
+      {
+        USBD_ErrLog("MTP: DATA exceeds the declared container length");
+        return (uint8_t)USBD_FAIL;
+      }
 
-      if (MTP_DataLength.temp_length == MTP_DataLength.totallen) /* we received all data*/
+      /* A short packet ends the transfer: it must complete the declared container */
+      if ((MTP_DataLength.totallen != 0xFFFFFFFFU) &&
+          (MTP_DataLength.rx_length < hmtp->MaxPcktLen) &&
+          (MTP_DataLength.rx_length != (MTP_DataLength.totallen - MTP_DataLength.temp_length)))
+      {
+        USBD_ErrLog("MTP: DATA terminated before the declared container length");
+        return (uint8_t)USBD_FAIL;
+      }
+
+      if ((MTP_DataLength.totallen == 0xFFFFFFFFU) &&
+          (MTP_DataLength.rx_length > (0xFFFFFFFFU - MTP_DataLength.temp_length)))
+      {
+        USBD_ErrLog("MTP: DATA length overflows the accumulated transfer length");
+        return (uint8_t)USBD_FAIL;
+      }
+
+      if (MTP_DataLength.rx_length != 0U)
+      {
+        MTP_DataLength.prv_len = MTP_DataLength.temp_length - MTP_CONT_HEADER_SIZE;
+        (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
+        MTP_DataLength.temp_length += MTP_DataLength.rx_length;
+      }
+
+      if ((MTP_DataLength.totallen == 0xFFFFFFFFU) &&
+          (MTP_DataLength.rx_length < hmtp->MaxPcktLen))
+      {
+        hmtp->RECEIVE_DATA_STATUS = SEND_RESPONSE;
+        (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
+        (void)USBD_MTP_STORAGE_SendContainer(pdev, DATA_TYPE);
+      }
+      else if ((MTP_DataLength.totallen != 0xFFFFFFFFU) &&
+               (MTP_DataLength.temp_length == MTP_DataLength.totallen))
       {
         hmtp->RECEIVE_DATA_STATUS = SEND_RESPONSE;
         (void)USBD_MTP_STORAGE_DecodeOperations(pdev);
@@ -449,7 +543,8 @@ static uint8_t USBD_MTP_STORAGE_ReceiveContainer(USBD_HandleTypeDef  *pdev,
   uint32_t Counter;
   uint32_t *pdst = pDst;
 
-  if ((pDst == NULL) || (len > MTP_MEDIA_PACKET))
+  if ((hmtp == NULL) || (pDst == NULL) ||
+      (len < MTP_CONT_HEADER_SIZE) || (len > MTP_MEDIA_PACKET))
   {
     return (uint8_t)USBD_FAIL;
   }
@@ -508,12 +603,14 @@ void USBD_MTP_STORAGE_Cancel(USBD_HandleTypeDef  *pdev,
   */
 static uint8_t USBD_MTP_STORAGE_SendData(USBD_HandleTypeDef *pdev, uint8_t *buf, uint32_t len)
 {
-#ifdef USE_USBD_COMPOSITE
-  /* Get the Endpoints addresses allocated for this class instance */
-  MTPInEpAdd = USBD_CoreGetEPAdd(pdev, USBD_EP_IN, USBD_EP_TYPE_BULK, (uint8_t)pdev->classId);
-#endif /* USE_USBD_COMPOSITE */
+  USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
-  (void)USBD_LL_Transmit(pdev, MTPInEpAdd, buf, len);
+  if (hmtp == NULL)
+  {
+    return (uint8_t)USBD_FAIL;
+  }
+
+  (void)USBD_LL_Transmit(pdev, hmtp->in_ep, buf, len);
 
   return (uint8_t)USBD_OK;
 }

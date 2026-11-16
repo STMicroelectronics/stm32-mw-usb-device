@@ -58,6 +58,12 @@
   * @{
   */
 
+/* One aligned EP0 packet per USB controller (device IDs 0 and 1). */
+#if defined(__ICCARM__)
+#pragma data_alignment=4
+#endif
+__ALIGN_BEGIN static uint8_t ctl_dma_buffer[2U][USB_MAX_EP0_SIZE] __ALIGN_END;
+
 /**
   * @}
   */
@@ -76,6 +82,46 @@
   */
 
 /**
+  * @brief  USBD_CtlStageData
+  *         Stage one unaligned packet, or snapshot a short status response.
+  * @param  pdev: device instance
+  * @param  pbuf: pointer to data buffer
+  * @param  len: remaining length, updated to the staged packet length
+  * @retval transmit buffer, or NULL for invalid non-empty transfers
+  */
+static uint8_t *USBD_CtlStageData(USBD_HandleTypeDef *pdev, uint8_t *pbuf, uint32_t *len)
+{
+  uint32_t idx;
+  uint8_t *staging;
+
+  if ((*len != 0U) && (pbuf == NULL))
+  {
+    return NULL;
+  }
+
+  if ((*len == 0U) || ((*len > 4U) && (((uint32_t)pbuf & 0x03U) == 0U)))
+  {
+    return pbuf;
+  }
+
+  if ((pdev->id >= 2U) ||
+      (pdev->ep_in[0].maxpacket == 0U) || (pdev->ep_in[0].maxpacket > USB_MAX_EP0_SIZE))
+  {
+    return NULL;
+  }
+
+  staging = ctl_dma_buffer[pdev->id];
+  *len = MIN(*len, (uint32_t)pdev->ep_in[0].maxpacket);
+
+  for (idx = 0U; idx < *len; idx++)
+  {
+    staging[idx] = pbuf[idx];
+  }
+
+  return staging;
+}
+
+/**
   * @brief  USBD_CtlSendData
   *         send data on the ctl pipe
   * @param  pdev: device instance
@@ -86,6 +132,14 @@
 USBD_StatusTypeDef USBD_CtlSendData(USBD_HandleTypeDef *pdev,
                                     uint8_t *pbuf, uint32_t len)
 {
+  uint32_t packet_length = len;
+  uint8_t *aligned_buffer = USBD_CtlStageData(pdev, pbuf, &packet_length);
+
+  if ((len != 0U) && (aligned_buffer == NULL))
+  {
+    return USBD_FAIL;
+  }
+
   /* Set EP0 State */
   pdev->ep0_state = USBD_EP0_DATA_IN;
   pdev->ep_in[0].total_length = len;
@@ -98,9 +152,7 @@ USBD_StatusTypeDef USBD_CtlSendData(USBD_HandleTypeDef *pdev,
 #endif /* USBD_AVOID_PACKET_SPLIT_MPS */
 
   /* Start the transfer */
-  (void)USBD_LL_Transmit(pdev, 0x00U, pbuf, len);
-
-  return USBD_OK;
+  return USBD_LL_Transmit(pdev, 0x00U, aligned_buffer, packet_length);
 }
 
 /**
@@ -114,10 +166,15 @@ USBD_StatusTypeDef USBD_CtlSendData(USBD_HandleTypeDef *pdev,
 USBD_StatusTypeDef USBD_CtlContinueSendData(USBD_HandleTypeDef *pdev,
                                             uint8_t *pbuf, uint32_t len)
 {
-  /* Start the next transfer */
-  (void)USBD_LL_Transmit(pdev, 0x00U, pbuf, len);
+  uint8_t *aligned_buffer = USBD_CtlStageData(pdev, pbuf, &len);
 
-  return USBD_OK;
+  if ((len != 0U) && (aligned_buffer == NULL))
+  {
+    return USBD_FAIL;
+  }
+
+  /* Start the next transfer */
+  return USBD_LL_Transmit(pdev, 0x00U, aligned_buffer, len);
 }
 
 /**
@@ -223,4 +280,3 @@ uint32_t USBD_GetRxCount(USBD_HandleTypeDef *pdev, uint8_t ep_addr)
 /**
   * @}
   */
-
